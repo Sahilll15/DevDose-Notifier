@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Learning Notifier - Daily Developer Insights</title>
+    <meta name="description" content="Get daily learning topics for React, System Design, Core JavaScript, Backend Development, and Interview Prep. Powered by AI.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles/main.css">
+</head>
+<body>
+    <div class="bg-animation"></div>
+
+    <!-- Header -->
+    <header class="header" id="header">
+        <nav class="nav">
+            <a href="/" class="logo">
+                <div class="logo-icon">📚</div>
+                Learning Notifier
+            </a>
+            <ul class="nav-links">
+                <li><a href="#features">Features</a></li>
+                <li><a href="#register">Register</a></li>
+                <li><a href="/docs">API Docs</a></li>
+                <li><a href="/api" target="_blank">Swagger UI</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-container">
+            <div class="hero-content">
+                <h1 class="fade-in-up">Daily Developer Insights</h1>
+                <p class="fade-in-up stagger-1">Get personalized learning topics powered by AI. Master React, System Design, Core JavaScript, Backend Development, and Interview Prep with daily curated content.</p>
+                <div class="hero-buttons fade-in-up stagger-2">
+                    <a href="#register" class="btn btn-primary">
+                        <span>🚀</span>
+                        Start Learning
+                    </a>
+                    <a href="/docs" class="btn btn-secondary">
+                        <span>📖</span>
+                        View API Docs
+                    </a>
+                </div>
+            </div>
+            <div class="hero-visual">
+                <div class="floating-card">
+                    <div class="card-icon">⚛️</div>
+                    <div class="card-title">React Mastery</div>
+                    <div class="card-desc">Advanced patterns & hooks</div>
+                </div>
+                <div class="floating-card">
+                    <div class="card-icon">🏗️</div>
+                    <div class="card-title">System Design</div>
+                    <div class="card-desc">Scalable architectures</div>
+                </div>
+                <div class="floating-card">
+                    <div class="card-icon">💻</div>
+                    <div class="card-title">Core JavaScript</div>
+                    <div class="card-desc">Deep language insights</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features" id="features">
+        <div class="container">
+            <div class="section-header">
+                <h2 class="section-title">Why Choose Learning Notifier?</h2>
+                <p class="section-subtitle">Empowering developers with cutting-edge learning experiences</p>
+            </div>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">🤖</div>
+                    <h3 class="feature-title">AI-Powered Content</h3>
+                    <p class="feature-desc">Advanced AI generates unique, personalized learning topics daily. No more repetitive content - every day brings fresh insights.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🎯</div>
+                    <h3 class="feature-title">Focused Learning</h3>
+                    <p class="feature-desc">Specialized topics in React, System Design, Core JavaScript, Backend Development, and Interview Preparation.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">📧</div>
+                    <h3 class="feature-title">Daily Notifications</h3>
+                    <p class="feature-desc">Automated daily emails at 9 AM with beautifully formatted content. Never miss your learning opportunity.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🔒</div>
+                    <h3 class="feature-title">Secure & Private</h3>
+                    <p class="feature-desc">Admin-protected API with secure authentication. Your data and access are always protected.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">📊</div>
+                    <h3 class="feature-title">Content Tracking</h3>
+                    <p class="feature-desc">Smart content storage prevents duplicates and tracks your learning journey with detailed analytics.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">⚡</div>
+                    <h3 class="feature-title">Modern Tech Stack</h3>
+                    <p class="feature-desc">Built with NestJS, MongoDB, and cutting-edge technologies for reliability and performance.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Registration Section -->
+    <section class="registration" id="register">
+        <div class="container">
+            <div class="section-header">
+                <h2 class="section-title">Join Our Learning Community</h2>
+                <p class="section-subtitle">Start your journey to becoming a better developer today</p>
+            </div>
+            <div class="registration-container">
+                <div class="success-message" id="successMessage">
+                    <strong>🎉 Registration Successful!</strong><br>
+                    Welcome to Learning Notifier! You'll start receiving daily learning topics soon.
+                </div>
+                <div class="error-message" id="errorMessage">
+                    <strong>❌ Registration Failed</strong><br>
+                    <span id="errorText">Please check your information and try again.</span>
+                </div>
+                
+                <form id="registrationForm">
+                    <div class="form-group">
+                        <label for="name">Full Name *</label>
+                        <input type="text" id="name" name="name" placeholder="Enter your full name" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="email">Email Address *</label>
+                        <input type="email" id="email" name="email" placeholder="Enter your email address" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="type">Developer Type</label>
+                        <select id="type" name="type">
+                            <option value="developer">Developer</option>
+                            <option value="frontend">Frontend Developer</option>
+                            <option value="backend">Backend Developer</option>
+                            <option value="fullstack">Full Stack Developer</option>
+                            <option value="student">Student</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="isAdmin" name="isAdmin">
+                        <label for="isAdmin">I am an admin (requires admin code)</label>
+                    </div>
+                    
+                    <div class="form-group" id="adminCodeGroup" style="display: none;">
+                        <label for="adminCode">Admin Code *</label>
+                        <input type="password" id="adminCode" name="adminCode" placeholder="Enter admin code">
+                    </div>
+                    
+                    <button type="submit" class="btn-register" id="registerBtn">
+                        <span>🚀</span>
+                        Register for Daily Learning
+                    </button>
+                    
+                    <div class="loading" id="loading">
+                        <div class="spinner"></div>
+                        Registering you...
+                    </div>
+                </form>
+            </div>
+        </div>
+    </section>
+
+    <!-- Stats Section -->
+    <section class="stats">
+        <div class="container">
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-number">5+</div>
+                    <div class="stat-label">Learning Areas</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">24/7</div>
+                    <div class="stat-label">AI Content Generation</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">100%</div>
+                    <div class="stat-label">Unique Content</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">9 AM</div>
+                    <div class="stat-label">Daily Delivery</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-content">
+            <div class="footer-section">
+                <h3>Learning Notifier</h3>
+                <p>Daily AI-powered learning topics for developers</p>
+                <div class="social-links">
+                    <a href="https://github.com/yourusername/learning-notifier" class="social-link" target="_blank" title="GitHub Repository">
+                        <span>📱</span>
+                    </a>
+                    <a href="https://twitter.com/yourusername" class="social-link" target="_blank" title="Follow on Twitter">
+                        <span>🐦</span>
+                    </a>
+                    <a href="https://linkedin.com/in/yourusername" class="social-link" target="_blank" title="Connect on LinkedIn">
+                        <span>💼</span>
+                    </a>
+                </div>
+            </div>
+            <div class="footer-section">
+                <h3>Quick Links</h3>
+                <a href="#features">Features</a>
+                <a href="#register">Register</a>
+                <a href="/docs">API Documentation</a>
+                <a href="/api" target="_blank">Swagger UI</a>
+            </div>
+            <div class="footer-section">
+                <h3>Resources</h3>
+                <a href="https://github.com/yourusername/learning-notifier" target="_blank">GitHub Repository</a>
+                <a href="https://github.com/yourusername/learning-notifier/issues" target="_blank">Report Issues</a>
+                <a href="https://github.com/yourusername/learning-notifier/discussions" target="_blank">Discussions</a>
+                <a href="https://github.com/yourusername/learning-notifier/blob/main/README.md" target="_blank">Documentation</a>
+            </div>
+            <div class="footer-section">
+                <h3>Contact</h3>
+                <p>Built with ❤️ by developers</p>
+                <p>Open source and community-driven</p>
+                <a href="mailto:contact@learningnotifier.com">contact@learningnotifier.com</a>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>&copy; 2024 Learning Notifier. Empowering developers with daily insights.</p>
+        </div>
+    </footer>
+
+    <script src="js/main.js"></script>
+</body>
+</html>

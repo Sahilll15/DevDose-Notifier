@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Documentation - Learning Notifier</title>
+    <meta name="description" content="Complete API documentation for Learning Notifier - Daily developer insights API">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles/main.css">
+    <style>
+        .api-hero {
+            background: linear-gradient(135deg, var(--bg-secondary), var(--bg-tertiary));
+            padding: 8rem 2rem 4rem;
+            text-align: center;
+        }
+        
+        .api-hero h1 {
+            font-size: 3.5rem;
+            font-weight: 900;
+            margin-bottom: 1rem;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .api-hero p {
+            font-size: 1.25rem;
+            color: var(--text-secondary);
+            max-width: 600px;
+            margin: 0 auto 2rem;
+        }
+        
+        .api-nav {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        
+        .api-nav a {
+            padding: 0.75rem 1.5rem;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+        
+        .api-nav a:hover {
+            background: var(--primary);
+            color: white;
+            transform: translateY(-2px);
+        }
+        
+        .code-block {
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1rem 0;
+            position: relative;
+            overflow-x: auto;
+        }
+        
+        .code-block code {
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            color: var(--text-primary);
+            font-size: 0.875rem;
+            line-height: 1.5;
+        }
+        
+        .copy-code {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 0.25rem 0.5rem;
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .copy-code:hover {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .response-example {
+            background: var(--bg-primary);
+            border-left: 4px solid var(--success);
+            padding: 1rem;
+            margin: 1rem 0;
+            border-radius: 0 8px 8px 0;
+        }
+        
+        .error-example {
+            background: var(--bg-primary);
+            border-left: 4px solid var(--error);
+            padding: 1rem;
+            margin: 1rem 0;
+            border-radius: 0 8px 8px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-animation"></div>
+
+    <!-- Header -->
+    <header class="header" id="header">
+        <nav class="nav">
+            <a href="/" class="logo">
+                <div class="logo-icon">📚</div>
+                Learning Notifier
+            </a>
+            <ul class="nav-links">
+                <li><a href="/">Home</a></li>
+                <li><a href="/#features">Features</a></li>
+                <li><a href="/#register">Register</a></li>
+                <li><a href="/api" target="_blank">Swagger UI</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <!-- API Hero Section -->
+    <section class="api-hero">
+        <div class="container">
+            <h1>API Documentation</h1>
+            <p>Complete reference for Learning Notifier API endpoints, authentication, and usage examples.</p>
+            <div class="api-nav">
+                <a href="#authentication">Authentication</a>
+                <a href="#endpoints">Endpoints</a>
+                <a href="#examples">Examples</a>
+                <a href="#errors">Error Codes</a>
+                <a href="/api" target="_blank">Interactive Docs</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- API Documentation -->
+    <section class="api-docs">
+        <div class="api-container">
+            <!-- Authentication Section -->
+            <div id="authentication" class="api-section">
+                <h2 class="section-title">Authentication</h2>
+                <p class="api-description">
+                    Learning Notifier API uses admin code authentication for protected endpoints. 
+                    Regular endpoints are public, but admin operations require a valid admin code.
+                </p>
+                
+                <div class="api-endpoint">
+                    <div class="api-header">
+                        <span class="method post">POST</span>
+                        <span class="endpoint-path">/swagger-auth/verify</span>
+                    </div>
+                    <div class="api-body">
+                        <p class="api-description">Verify admin code for Swagger UI access</p>
+                        <div class="api-params">
+                            <h4>Query Parameters:</h4>
+                            <table class="param-table">
+                                <thead>
+                                    <tr>
+                                        <th>Parameter</th>
+                                        <th>Type</th>
+                                        <th>Required</th>
+                                        <th>Description</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><span class="param-name">code</span></td>
+                                        <td><span class="param-type">string</span></td>
+                                        <td>Yes</td>
+                                        <td>Admin authentication code</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Registration Endpoints -->
+            <div id="endpoints" class="api-section">
+                <h2 class="section-title">Registration Endpoints</h2>
+                
+                <div class="api-endpoint">
+                    <div class="api-header">
+                        <span class="method post">POST</span>
+                        <span class="endpoint-path">/register</span>
+                    </div>
+                    <div class="api-body">
+                        <p class="api-description">Register a new user for daily learning notifications</p>
+                        <div class="api-params">
+                            <h4>Request Body:</h4>
+                            <table class="param-table">
+                                <thead>
+                                    <tr>
+                                        <th>Parameter</th>
+                                        <th>Type</th>
+                                        <th>Required</th>
+                                        <th>Description</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><span class="param-name">name</span></td>
+                                        <td><span class="param-type">string</span></td>
+                                        <td>Yes</td>
+                                        <td>User's full name</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="param-name">email</span></td>
+                                        <td><span class="param-type">string</span></td>
+                                        <td>Yes</td>
+                                        <td>User's email address</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="param-name">type</span></td>
+                                        <td><span class="param-type">string</span></td>
+                                        <td>No</td>
+                                        <td>Developer type (developer, frontend, backend, fullstack, student, other)</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="param-name">isAdmin</span></td>
+                                        <td><span class="param-type">boolean</span></td>
+                                        <td>No</td>
+                                        <td>Whether user is an admin</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="param-name">adminCode</span></td>
+                                        <td><span class="param-type">string</span></td>
+                                        <td>If isAdmin=true</td>
+                                        <td>Admin authentication code</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <h4>Example Request:</h4>
+                        <div class="code-block">
+                            <button class="copy-code">Copy</button>
+                            <code>{
+  "name": "John Doe",
+  "email": "john@example.com",
+  "type": "developer",
+  "isAdmin": false
+}</code>
+                        </div>
+                        
+                        <h4>Success Response (200):</h4>
+                        <div class="response-example">
+                            <code>{
+  "message": "Registration completed successfully",
+  "user": {
+    "_id": "64f1a2b3c4d5e6f7g8h9i0j1",
+    "name": "John Doe",
+    "email": "john@example.com",
+    "type": "developer",
+    "isAdmin": false
+  }
+}</code>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="api-endpoint">
+                    <div class="api-header">
+                        <span class="method get">GET</span>
+                        <span class="endpoint-path">/register</span>
+                    </div>
+                    <div class="api-body">
+                        <p class="api-description">Get all registered users (Admin only)</p>
+                        <div class="api-params">
+                            <h4>Request Body:</h4>
+                            <table class="param-table">
+                                <thead>
+                                    <tr>
+                                        <th>Parameter</th>
+                                        <th>Type</th>
+                                        <th>Required</th>
+                                        <th>Description</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><span class="param-name">adminCode</span></td>
+                                        <td><span class="param-type">string</span></td>
+                                        <td>Yes</td>
+                                        <td>Admin authentication code</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="api-endpoint">
+                    <div class="api-header">
+                        <span class="method get">GET</span>
+                        <span class="endpoint-path">/register/:id</span>
+                    </div>
+                    <div class="api-body">
+                        <p class="api-description">Get a specific user by ID (Admin only)</p>
+                        <div class="api-params">
+                            <h4>Path Parameters:</h4>
+                            <table class="param-table">
+                                <thead>
+                                    <tr>
+                                        <th>Parameter</th>
+                                        <th>Type</th>
+                                        <th>Required</th>
+                                        <th>Description</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><span class="param-name">id</span></td>
+                                        <td><span class="param-type">string</span></td>
+                                        <td>Yes</td>
+                                        <td>User's MongoDB ObjectId</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="api-endpoint">
+                    <div class="api-header">
+                        <span class="method put">PUT</span>
+                        <span class="endpoint-path">/register/:id</span>
+                    </div>
+                    <div class="api-body">
+                        <p class="api-description">Update a user (Admin only)</p>
+                        <div class="api-params">
+                            <h4>Request Body:</h4>
+                            <table class="param-table">
+                                <thead>
+                                    <tr>
+                                        <th>Parameter</th>
+                                        <th>Type</th>
+                                        <th>Required</th>
+                                        <th>Description</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><span class="param-name">name</span></td>
+                                        <td><span class="param-type">string</span></td>
+                                        <td>No</td>
+                                        <td>Updated user name</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="param-name">email</span></td>
+                                        <td><span class="param-type">string</span></td>
+                                        <td>No</td>
+                                        <td>Updated email address</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="param-name">type</span></td>
+                                        <td><span class="param-type">string</span></td>
+                                        <td>No</td>
+                                        <td>Updated developer type</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="param-name">adminCode</span></td>
+                                        <td><span class="param-type">string</span></td>
+                                        <td>Yes</td>
+                                        <td>Admin authentication code</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="api-endpoint">
+                    <div class="api-header">
+                        <span class="method delete">DELETE</span>
+                        <span class="endpoint-path">/register/:id</span>
+                    </div>
+                    <div class="api-body">
+                        <p class="api-description">Delete a user (Admin only)</p>
+                        <div class="api-params">
+                            <h4>Request Body:</h4>
+                            <table class="param-table">
+                                <thead>
+                                    <tr>
+                                        <th>Parameter</th>
+                                        <th>Type</th>
+                                        <th>Required</th>
+                                        <th>Description</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><span class="param-name">adminCode</span></td>
+                                        <td><span class="param-type">string</span></td>
+                                        <td>Yes</td>
+                                        <td>Admin authentication code</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Notification Endpoints -->
+            <div class="api-section">
+                <h2 class="section-title">Notification Endpoints</h2>
+                
+                <div class="api-endpoint">
+                    <div class="api-header">
+                        <span class="method post">POST</span>
+                        <span class="endpoint-path">/notify/test</span>
+                    </div>
+                    <div class="api-body">
+                        <p class="api-description">Send a test notification to a specific user</p>
+                        <div class="api-params">
+                            <h4>Request Body:</h4>
+                            <table class="param-table">
+                                <thead>
+                                    <tr>
+                                        <th>Parameter</th>
+                                        <th>Type</th>
+                                        <th>Required</th>
+                                        <th>Description</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><span class="param-name">email</span></td>
+                                        <td><span class="param-type">string</span></td>
+                                        <td>Yes</td>
+                                        <td>Email address to send test notification</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="api-endpoint">
+                    <div class="api-header">
+                        <span class="method post">POST</span>
+                        <span class="endpoint-path">/notify/trigger</span>
+                    </div>
+                    <div class="api-body">
+                        <p class="api-description">Trigger daily notifications for all users</p>
+                        <div class="api-params">
+                            <h4>Request Body:</h4>
+                            <p>No parameters required</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Health Check -->
+            <div class="api-section">
+                <h2 class="section-title">System Endpoints</h2>
+                
+                <div class="api-endpoint">
+                    <div class="api-header">
+                        <span class="method get">GET</span>
+                        <span class="endpoint-path">/app/health</span>
+                    </div>
+                    <div class="api-body">
+                        <p class="api-description">Check API health status</p>
+                        <h4>Success Response (200):</h4>
+                        <div class="response-example">
+                            <code>{
+  "status": "ok",
+  "message": "Learning Notifier API is running",
+  "timestamp": "2024-01-15T10:30:00.000Z",
+  "version": "1.0.0"
+}</code>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Error Codes -->
+            <div id="errors" class="api-section">
+                <h2 class="section-title">Error Codes</h2>
+                
+                <div class="api-endpoint">
+                    <div class="api-body">
+                        <table class="param-table">
+                            <thead>
+                                <tr>
+                                    <th>Status Code</th>
+                                    <th>Error Type</th>
+                                    <th>Description</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>400</td>
+                                    <td>Bad Request</td>
+                                    <td>Invalid request parameters or missing required fields</td>
+                                </tr>
+                                <tr>
+                                    <td>401</td>
+                                    <td>Unauthorized</td>
+                                    <td>Invalid admin code or missing authentication</td>
+                                </tr>
+                                <tr>
+                                    <td>404</td>
+                                    <td>Not Found</td>
+                                    <td>Resource not found (user, endpoint, etc.)</td>
+                                </tr>
+                                <tr>
+                                    <td>409</td>
+                                    <td>Conflict</td>
+                                    <td>Resource already exists (duplicate email)</td>
+                                </tr>
+                                <tr>
+                                    <td>500</td>
+                                    <td>Internal Server Error</td>
+                                    <td>Server-side error occurred</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        
+                        <h4>Example Error Response:</h4>
+                        <div class="error-example">
+                            <code>{
+  "statusCode": 400,
+  "message": "User with this email already exists",
+  "error": "Bad Request"
+}</code>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-content">
+            <div class="footer-section">
+                <h3>Learning Notifier</h3>
+                <p>Daily AI-powered learning topics for developers</p>
+                <div class="social-links">
+                    <a href="https://github.com/yourusername/learning-notifier" class="social-link" target="_blank">
+                        <span>📱</span>
+                    </a>
+                    <a href="https://twitter.com/yourusername" class="social-link" target="_blank">
+                        <span>🐦</span>
+                    </a>
+                    <a href="https://linkedin.com/in/yourusername" class="social-link" target="_blank">
+                        <span>💼</span>
+                    </a>
+                </div>
+            </div>
+            <div class="footer-section">
+                <h3>API</h3>
+                <a href="/api" target="_blank">Swagger UI</a>
+                <a href="#authentication">Authentication</a>
+                <a href="#endpoints">Endpoints</a>
+                <a href="#errors">Error Codes</a>
+            </div>
+            <div class="footer-section">
+                <h3>Resources</h3>
+                <a href="https://github.com/yourusername/learning-notifier" target="_blank">GitHub Repository</a>
+                <a href="https://github.com/yourusername/learning-notifier/issues" target="_blank">Report Issues</a>
+                <a href="https://github.com/yourusername/learning-notifier/discussions" target="_blank">Discussions</a>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>&copy; 2024 Learning Notifier. Empowering developers with daily insights.</p>
+        </div>
+    </footer>
+
+    <script src="js/main.js"></script>
+</body>
+</html>

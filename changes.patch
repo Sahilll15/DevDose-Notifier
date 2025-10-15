@@ -1,0 +1,3673 @@
+diff --git a/README.md b/README.md
+index 4daa670..f0b4ba0 100644
+--- a/README.md
++++ b/README.md
+@@ -4,13 +4,18 @@ A NestJS application that sends daily learning topics to registered users via em
+ 
+ ## Features
+ 
++- **Modern Home Page**: Beautiful, responsive UI showcasing the product with animations and modern design
+ - **User Registration**: Register users with email and name
+-- **AI-Generated Content**: Uses Google Gemini AI to generate daily learning topics
++- **Admin Authentication**: Admin-only operations protected with admin code
++- **Protected API Documentation**: Swagger UI protected with admin code authentication
++- **AI-Generated Content**: Uses Google Gemini AI to generate unique daily learning topics
++- **Content Storage**: Prevents duplicate content generation by storing previous topics
+ - **Automated Notifications**: Sends daily emails at 9 AM using cron jobs
+ - **RESTful API**: Complete CRUD operations for user management
+-- **Swagger Documentation**: Interactive API documentation
+-- **Email Service**: HTML-formatted email notifications
+-- **MongoDB Integration**: Persistent user data storage
++- **Swagger Documentation**: Interactive API documentation with authentication
++- **Modern Email Design**: Beautiful, responsive HTML email templates
++- **MongoDB Integration**: Persistent user data and content storage
++- **Topic Focus**: Covers React, System Design, Core JavaScript, Backend Development, and Interview Prep
+ 
+ ## Tech Stack
+ 
+@@ -24,17 +29,23 @@ A NestJS application that sends daily learning topics to registered users via em
+ 
+ ## API Endpoints
+ 
++### Home
++- `GET /` - Beautiful home page with modern UI and product showcase
++
+ ### Registration
+-- `GET /register` - Get all users
+-- `POST /register` - Register new user
++- `GET /register` - Get all users (requires admin code)
++- `POST /register` - Register new user (admin code required for admin users)
+ - `GET /register/:id` - Get user by ID
+-- `PUT /register/:id` - Update user
+-- `DELETE /register/:id` - Delete user
++- `PUT /register/:id` - Update user (admin code required for admin operations)
++- `DELETE /register/:id` - Delete user (requires admin code)
+ 
+ ### Notifications
+ - `POST /notify/test` - Send test notification
+ - `POST /notify/trigger` - Manually trigger daily notifications
+ 
++### Swagger Authentication
++- `GET /swagger-auth/verify` - Verify admin code for Swagger access
++
+ ## Environment Variables
+ 
+ Create a `.env` file with the following variables:
+@@ -50,7 +61,11 @@ PORT=3000
+ GEMINI_API_KEY=your_gemini_api_key_here
+ 
+ # Email Configuration
+-EMAIL_FROM=noreply@learning-notifier.com
++SENDGRID_API_KEY=your_sendgrid_api_key_here
++EMAIL=your_email@example.com
++
++# Admin Configuration
++ADMIN_CODE=ADMIN123
+ ```
+ 
+ ## Installation
+@@ -75,10 +90,15 @@ EMAIL_FROM=noreply@learning-notifier.com
+ 
+ ## Usage
+ 
+-1. **Register Users**: Use the `/register` endpoint to add users
+-2. **Automatic Notifications**: The app automatically sends daily learning topics at 9 AM
+-3. **Test Notifications**: Use `/notify/test` to send test emails
+-4. **API Documentation**: Visit `http://localhost:3000/api` for Swagger docs
++1. **Home Page**: Visit `http://localhost:3000/` to see the beautiful home page with product showcase
++2. **Register Users**: Use the `/register` endpoint to add users
++   - For admin users: Include `adminCode` and set `isAdmin: true`
++   - Default admin code: `ADMIN123` (configurable via `ADMIN_CODE` env var)
++3. **Admin Operations**: Use admin code for user management operations
++4. **Automatic Notifications**: The app automatically sends daily learning topics at 9 AM
++5. **Content Uniqueness**: System prevents duplicate content by storing previous topics
++6. **Test Notifications**: Use `/notify/test` to send test emails
++7. **API Documentation**: Visit `http://localhost:3000/api` for Swagger docs (requires admin code)
+ 
+ ## Project Structure
+ 
+@@ -86,11 +106,25 @@ EMAIL_FROM=noreply@learning-notifier.com
+ src/
+ ├── app.module.ts              # Main application module
+ ├── main.ts                    # Application bootstrap
++├── auth/
++│   ├── admin-auth.service.ts  # Admin authentication service
++│   ├── admin-auth.module.ts   # Admin auth module
++│   ├── swagger-auth.service.ts # Swagger authentication service
++│   ├── swagger-auth.controller.ts # Swagger auth endpoints
++│   └── swagger-auth.middleware.ts # Swagger protection middleware
+ ├── constants/
+ │   └── prompt.ts              # AI prompt templates
++├── content/
++│   ├── schemas/
++│   │   └── content.schema.ts  # Content storage schema
++│   ├── content.service.ts     # Content management service
++│   └── content.module.ts      # Content module
+ ├── email/
+ │   ├── email.service.ts       # Email sending service
+ │   └── email.module.ts        # Email module
++├── home/
++│   ├── home.controller.ts     # Home page controller
++│   └── home.module.ts         # Home module
+ ├── notify/
+ │   ├── notify.service.ts      # Notification logic
+ │   ├── notify.controller.ts   # Notification endpoints
+diff --git a/package-lock.json b/package-lock.json
+index fd74f37..3e93536 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -18,9 +18,12 @@
+         "@nestjs/schedule": "^6.0.1",
+         "@nestjs/swagger": "^11.2.0",
+         "@sendgrid/mail": "^8.1.6",
++        "@types/cookie-parser": "^1.4.9",
+         "class-transformer": "^0.5.1",
+         "class-validator": "^0.14.2",
++        "cookie-parser": "^1.4.7",
+         "dotenv": "^17.2.3",
++        "hbs": "^4.2.0",
+         "mongoose": "^8.19.1",
+         "nodemailer": "^7.0.9",
+         "reflect-metadata": "^0.2.2",
+@@ -4285,7 +4288,6 @@
+       "version": "1.19.6",
+       "resolved": "https://registry.npmjs.org/@types/body-parser/-/body-parser-1.19.6.tgz",
+       "integrity": "sha512-HLFeCYgz89uk22N5Qg3dvGvsv46B8GLvKKo1zKG4NybA8U2DiEO3w9lqGg29t/tfLRJpJ6iQxnVw4OnB7MoM9g==",
+-      "dev": true,
+       "license": "MIT",
+       "dependencies": {
+         "@types/connect": "*",
+@@ -4296,12 +4298,20 @@
+       "version": "3.4.38",
+       "resolved": "https://registry.npmjs.org/@types/connect/-/connect-3.4.38.tgz",
+       "integrity": "sha512-K6uROf1LD88uDQqJCktA4yzL1YYAK6NgfsI0v/mTgyPKWsX1CnJ0XPSDhViejru1GcRkLWb8RlzFYJRqGUbaug==",
+-      "dev": true,
+       "license": "MIT",
+       "dependencies": {
+         "@types/node": "*"
+       }
+     },
++    "node_modules/@types/cookie-parser": {
++      "version": "1.4.9",
++      "resolved": "https://registry.npmjs.org/@types/cookie-parser/-/cookie-parser-1.4.9.tgz",
++      "integrity": "sha512-tGZiZ2Gtc4m3wIdLkZ8mkj1T6CEHb35+VApbL2T14Dew8HA7c+04dmKqsKRNC+8RJPm16JEK0tFSwdZqubfc4g==",
++      "license": "MIT",
++      "peerDependencies": {
++        "@types/express": "*"
++      }
++    },
+     "node_modules/@types/cookiejar": {
+       "version": "2.1.5",
+       "resolved": "https://registry.npmjs.org/@types/cookiejar/-/cookiejar-2.1.5.tgz",
+@@ -4342,7 +4352,6 @@
+       "version": "5.0.3",
+       "resolved": "https://registry.npmjs.org/@types/express/-/express-5.0.3.tgz",
+       "integrity": "sha512-wGA0NX93b19/dZC1J18tKWVIYWyyF2ZjT9vin/NRu0qzzvfVzWjs04iq2rQ3H65vCTQYlRqs3YHfY7zjdV+9Kw==",
+-      "dev": true,
+       "license": "MIT",
+       "dependencies": {
+         "@types/body-parser": "*",
+@@ -4354,7 +4363,6 @@
+       "version": "5.1.0",
+       "resolved": "https://registry.npmjs.org/@types/express-serve-static-core/-/express-serve-static-core-5.1.0.tgz",
+       "integrity": "sha512-jnHMsrd0Mwa9Cf4IdOzbz543y4XJepXrbia2T4b6+spXC2We3t1y6K44D3mR8XMFSXMCf3/l7rCgddfx7UNVBA==",
+-      "dev": true,
+       "license": "MIT",
+       "dependencies": {
+         "@types/node": "*",
+@@ -4367,7 +4375,6 @@
+       "version": "2.0.5",
+       "resolved": "https://registry.npmjs.org/@types/http-errors/-/http-errors-2.0.5.tgz",
+       "integrity": "sha512-r8Tayk8HJnX0FztbZN7oVqGccWgw98T/0neJphO91KkmOzug1KkofZURD4UaD5uH8AqcFLfdPErnBod0u71/qg==",
+-      "dev": true,
+       "license": "MIT"
+     },
+     "node_modules/@types/istanbul-lib-coverage": {
+@@ -4432,14 +4439,12 @@
+       "version": "1.3.5",
+       "resolved": "https://registry.npmjs.org/@types/mime/-/mime-1.3.5.tgz",
+       "integrity": "sha512-/pyBZWSLD2n0dcHE3hq8s8ZvcETHtEuF+3E7XVt0Ig2nvsVQXdghHVcEkIWjy9A0wKfTn97a/PSDYohKIlnP/w==",
+-      "dev": true,
+       "license": "MIT"
+     },
+     "node_modules/@types/node": {
+       "version": "22.18.10",
+       "resolved": "https://registry.npmjs.org/@types/node/-/node-22.18.10.tgz",
+       "integrity": "sha512-anNG/V/Efn/YZY4pRzbACnKxNKoBng2VTFydVu8RRs5hQjikP8CQfaeAV59VFSCzKNp90mXiVXW2QzV56rwMrg==",
+-      "dev": true,
+       "license": "MIT",
+       "dependencies": {
+         "undici-types": "~6.21.0"
+@@ -4460,21 +4465,18 @@
+       "version": "6.14.0",
+       "resolved": "https://registry.npmjs.org/@types/qs/-/qs-6.14.0.tgz",
+       "integrity": "sha512-eOunJqu0K1923aExK6y8p6fsihYEn/BYuQ4g0CxAAgFc4b/ZLN4CrsRZ55srTdqoiLzU2B2evC+apEIxprEzkQ==",
+-      "dev": true,
+       "license": "MIT"
+     },
+     "node_modules/@types/range-parser": {
+       "version": "1.2.7",
+       "resolved": "https://registry.npmjs.org/@types/range-parser/-/range-parser-1.2.7.tgz",
+       "integrity": "sha512-hKormJbkJqzQGhziax5PItDUTMAM9uE2XXQmM37dyd4hVM+5aVl7oVxMVUiVQn2oCQFN/LKCZdvSM0pFRqbSmQ==",
+-      "dev": true,
+       "license": "MIT"
+     },
+     "node_modules/@types/send": {
+       "version": "1.2.0",
+       "resolved": "https://registry.npmjs.org/@types/send/-/send-1.2.0.tgz",
+       "integrity": "sha512-zBF6vZJn1IaMpg3xUF25VK3gd3l8zwE0ZLRX7dsQyQi+jp4E8mMDJNGDYnYse+bQhYwWERTxVwHpi3dMOq7RKQ==",
+-      "dev": true,
+       "license": "MIT",
+       "dependencies": {
+         "@types/node": "*"
+@@ -4484,7 +4486,6 @@
+       "version": "1.15.9",
+       "resolved": "https://registry.npmjs.org/@types/serve-static/-/serve-static-1.15.9.tgz",
+       "integrity": "sha512-dOTIuqpWLyl3BBXU3maNQsS4A3zuuoYRNIvYSxxhebPfXg2mzWQEPne/nlJ37yOse6uGgR386uTpdsx4D0QZWA==",
+-      "dev": true,
+       "license": "MIT",
+       "dependencies": {
+         "@types/http-errors": "*",
+@@ -4496,7 +4497,6 @@
+       "version": "0.17.5",
+       "resolved": "https://registry.npmjs.org/@types/send/-/send-0.17.5.tgz",
+       "integrity": "sha512-z6F2D3cOStZvuk2SaP6YrwkNO65iTZcwA2ZkSABegdkAh/lf+Aa/YQndZVfmEXT5vgAp6zv06VQ3ejSVjAny4w==",
+-      "dev": true,
+       "license": "MIT",
+       "dependencies": {
+         "@types/mime": "^1",
+@@ -6324,6 +6324,25 @@
+         "node": ">= 0.6"
+       }
+     },
++    "node_modules/cookie-parser": {
++      "version": "1.4.7",
++      "resolved": "https://registry.npmjs.org/cookie-parser/-/cookie-parser-1.4.7.tgz",
++      "integrity": "sha512-nGUvgXnotP3BsjiLX2ypbQnWoGUPIIfHQNZkkC668ntrzGWEZVW70HDEB1qnNGMicPje6EttlIgzo51YSwNQGw==",
++      "license": "MIT",
++      "dependencies": {
++        "cookie": "0.7.2",
++        "cookie-signature": "1.0.6"
++      },
++      "engines": {
++        "node": ">= 0.8.0"
++      }
++    },
++    "node_modules/cookie-parser/node_modules/cookie-signature": {
++      "version": "1.0.6",
++      "resolved": "https://registry.npmjs.org/cookie-signature/-/cookie-signature-1.0.6.tgz",
++      "integrity": "sha512-QADzlaHc8icV8I7vbaJXJwod9HWYp8uCqf1xa4OfNu1T7JVxQIrUgOWtHdNDtPiywmFbiS12VjotIXLrKM3orQ==",
++      "license": "MIT"
++    },
+     "node_modules/cookie-signature": {
+       "version": "1.2.2",
+       "resolved": "https://registry.npmjs.org/cookie-signature/-/cookie-signature-1.2.2.tgz",
+@@ -7320,6 +7339,12 @@
+         }
+       }
+     },
++    "node_modules/foreachasync": {
++      "version": "3.0.0",
++      "resolved": "https://registry.npmjs.org/foreachasync/-/foreachasync-3.0.0.tgz",
++      "integrity": "sha512-J+ler7Ta54FwwNcx6wQRDhTIbNeyDcARMkOcguEqnEdtm0jKvN3Li3PDAb2Du3ubJYEWfYL83XMROXdsXAXycw==",
++      "license": "Apache2"
++    },
+     "node_modules/foreground-child": {
+       "version": "3.3.1",
+       "resolved": "https://registry.npmjs.org/foreground-child/-/foreground-child-3.3.1.tgz",
+@@ -7751,6 +7776,50 @@
+         "node": ">= 0.4"
+       }
+     },
++    "node_modules/hbs": {
++      "version": "4.2.0",
++      "resolved": "https://registry.npmjs.org/hbs/-/hbs-4.2.0.tgz",
++      "integrity": "sha512-dQwHnrfWlTk5PvG9+a45GYpg0VpX47ryKF8dULVd6DtwOE6TEcYQXQ5QM6nyOx/h7v3bvEQbdn19EDAcfUAgZg==",
++      "license": "MIT",
++      "dependencies": {
++        "handlebars": "4.7.7",
++        "walk": "2.3.15"
++      },
++      "engines": {
++        "node": ">= 0.8",
++        "npm": "1.2.8000 || >= 1.4.16"
++      }
++    },
++    "node_modules/hbs/node_modules/handlebars": {
++      "version": "4.7.7",
++      "resolved": "https://registry.npmjs.org/handlebars/-/handlebars-4.7.7.tgz",
++      "integrity": "sha512-aAcXm5OAfE/8IXkcZvCepKU3VzW1/39Fb5ZuqMtgI/hT8X2YgoMvBY5dLhq/cpOvw7Lk1nK/UF71aLG/ZnVYRA==",
++      "license": "MIT",
++      "dependencies": {
++        "minimist": "^1.2.5",
++        "neo-async": "^2.6.0",
++        "source-map": "^0.6.1",
++        "wordwrap": "^1.0.0"
++      },
++      "bin": {
++        "handlebars": "bin/handlebars"
++      },
++      "engines": {
++        "node": ">=0.4.7"
++      },
++      "optionalDependencies": {
++        "uglify-js": "^3.1.4"
++      }
++    },
++    "node_modules/hbs/node_modules/source-map": {
++      "version": "0.6.1",
++      "resolved": "https://registry.npmjs.org/source-map/-/source-map-0.6.1.tgz",
++      "integrity": "sha512-UjgapumWlbMhkBgzT7Ykc5YXUT46F0iKu8SGXq0bcwP5dz/h0Plj6enJqjz1Zbq2l5WaqYnrVbwWOWMyF3F47g==",
++      "license": "BSD-3-Clause",
++      "engines": {
++        "node": ">=0.10.0"
++      }
++    },
+     "node_modules/html-escaper": {
+       "version": "2.0.2",
+       "resolved": "https://registry.npmjs.org/html-escaper/-/html-escaper-2.0.2.tgz",
+@@ -9593,7 +9662,6 @@
+       "version": "2.6.2",
+       "resolved": "https://registry.npmjs.org/neo-async/-/neo-async-2.6.2.tgz",
+       "integrity": "sha512-Yd3UES5mWCSqR+qNT93S3UoYUkqAZ9lLg8a7g9rimsWmYGK8cVToA4/sF3RrshdyV3sAGMXVUmpMYOw+dLpOuw==",
+-      "dev": true,
+       "license": "MIT"
+     },
+     "node_modules/node-abort-controller": {
+@@ -11620,7 +11688,6 @@
+       "version": "3.19.3",
+       "resolved": "https://registry.npmjs.org/uglify-js/-/uglify-js-3.19.3.tgz",
+       "integrity": "sha512-v3Xu+yuwBXisp6QYTcH4UbH+xYJXqnq2m/LtQVWKWzYc1iehYnLixoQDN9FH6/j9/oybfd6W9Ghwkl8+UMKTKQ==",
+-      "dev": true,
+       "license": "BSD-2-Clause",
+       "optional": true,
+       "bin": {
+@@ -11658,7 +11725,6 @@
+       "version": "6.21.0",
+       "resolved": "https://registry.npmjs.org/undici-types/-/undici-types-6.21.0.tgz",
+       "integrity": "sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ==",
+-      "dev": true,
+       "license": "MIT"
+     },
+     "node_modules/universalify": {
+@@ -11802,6 +11868,15 @@
+         "node": ">= 0.8"
+       }
+     },
++    "node_modules/walk": {
++      "version": "2.3.15",
++      "resolved": "https://registry.npmjs.org/walk/-/walk-2.3.15.tgz",
++      "integrity": "sha512-4eRTBZljBfIISK1Vnt69Gvr2w/wc3U6Vtrw7qiN5iqYJPH7LElcYh/iU4XWhdCy2dZqv1ToMyYlybDylfG/5Vg==",
++      "license": "(MIT OR Apache-2.0)",
++      "dependencies": {
++        "foreachasync": "^3.0.0"
++      }
++    },
+     "node_modules/walker": {
+       "version": "1.0.8",
+       "resolved": "https://registry.npmjs.org/walker/-/walker-1.0.8.tgz",
+@@ -12089,7 +12164,6 @@
+       "version": "1.0.0",
+       "resolved": "https://registry.npmjs.org/wordwrap/-/wordwrap-1.0.0.tgz",
+       "integrity": "sha512-gvVzJFlPycKc5dZN4yPkP8w7Dc37BtP1yczEneOb4uq34pXZcvrtRTmWV8W+Ume+XCxKgbjM+nevkyFPMybd4Q==",
+-      "dev": true,
+       "license": "MIT"
+     },
+     "node_modules/wrap-ansi": {
+diff --git a/package.json b/package.json
+index 7e7df14..a05c8e5 100644
+--- a/package.json
++++ b/package.json
+@@ -29,9 +29,12 @@
+     "@nestjs/schedule": "^6.0.1",
+     "@nestjs/swagger": "^11.2.0",
+     "@sendgrid/mail": "^8.1.6",
++    "@types/cookie-parser": "^1.4.9",
+     "class-transformer": "^0.5.1",
+     "class-validator": "^0.14.2",
++    "cookie-parser": "^1.4.7",
+     "dotenv": "^17.2.3",
++    "hbs": "^4.2.0",
+     "mongoose": "^8.19.1",
+     "nodemailer": "^7.0.9",
+     "reflect-metadata": "^0.2.2",
+diff --git a/src/app.controller.ts b/src/app.controller.ts
+index cce879e..22f0b65 100644
+--- a/src/app.controller.ts
++++ b/src/app.controller.ts
+@@ -1,4 +1,5 @@
+-import { Controller, Get } from '@nestjs/common';
++import { Controller, Get, Res } from '@nestjs/common';
++import type { Response } from 'express';
+ import { AppService } from './app.service';
+ 
+ @Controller()
+@@ -6,7 +7,17 @@ export class AppController {
+   constructor(private readonly appService: AppService) {}
+ 
+   @Get()
+-  getHello(): string {
+-    return this.appService.getHello();
++  root(@Res() res: Response) {
++    return res.sendFile('index.html', { root: 'views' });
++  }
++
++  @Get('docs')
++  apiDocs(@Res() res: Response) {
++    return res.sendFile('api-docs.html', { root: 'views' });
++  }
++
++  @Get('app/health')
++  getHealth() {
++    return this.appService.getHealth();
+   }
+ }
+diff --git a/src/app.module.ts b/src/app.module.ts
+index 223de86..8f983d6 100644
+--- a/src/app.module.ts
++++ b/src/app.module.ts
+@@ -7,6 +7,7 @@ import { ConfigModule } from '@nestjs/config';
+ import { ScheduleModule } from '@nestjs/schedule';
+ import { NotifyModule } from './notify/notify.module';
+ import { TopicsModule } from './topics/topics.module';
++import { ContentModule } from './content/content.module';
+ 
+ @Module({
+   imports: [
+@@ -18,6 +19,7 @@ import { TopicsModule } from './topics/topics.module';
+     MongooseModule.forRoot(process.env.MONGO_URL as string),
+     NotifyModule,
+     TopicsModule,
++    ContentModule,
+   ],
+   controllers: [AppController],
+   providers: [AppService],
+diff --git a/src/app.service.ts b/src/app.service.ts
+index 927d7cc..13d2b99 100644
+--- a/src/app.service.ts
++++ b/src/app.service.ts
+@@ -2,7 +2,12 @@ import { Injectable } from '@nestjs/common';
+ 
+ @Injectable()
+ export class AppService {
+-  getHello(): string {
+-    return 'Hello World!';
++  getHealth() {
++    return {
++      status: 'ok',
++      message: 'Learning Notifier API is running',
++      timestamp: new Date().toISOString(),
++      version: '1.0.0',
++    };
+   }
+ }
+diff --git a/src/auth/admin-auth.module.ts b/src/auth/admin-auth.module.ts
+new file mode 100644
+index 0000000..05194f5
+--- /dev/null
++++ b/src/auth/admin-auth.module.ts
+@@ -0,0 +1,16 @@
++import { Module, MiddlewareConsumer, RequestMethod } from '@nestjs/common';
++import { AdminAuthService } from './admin-auth.service';
++import { SwaggerAuthService } from './swagger-auth.service';
++import { SwaggerAuthController } from './swagger-auth.controller';
++import { SwaggerAuthMiddleware } from './swagger-auth.middleware';
++
++@Module({
++  providers: [AdminAuthService, SwaggerAuthService, SwaggerAuthMiddleware],
++  controllers: [SwaggerAuthController],
++  exports: [AdminAuthService, SwaggerAuthService],
++})
++export class AdminAuthModule {
++  configure(consumer: MiddlewareConsumer) {
++    consumer.apply(SwaggerAuthMiddleware).forRoutes('api');
++  }
++}
+diff --git a/src/auth/admin-auth.service.ts b/src/auth/admin-auth.service.ts
+new file mode 100644
+index 0000000..5395104
+--- /dev/null
++++ b/src/auth/admin-auth.service.ts
+@@ -0,0 +1,20 @@
++import { Injectable, UnauthorizedException, Logger } from '@nestjs/common';
++import { ConfigService } from '@nestjs/config';
++
++@Injectable()
++export class AdminAuthService {
++  private readonly logger = new Logger(AdminAuthService.name);
++  private readonly adminCode: string;
++
++  constructor(private readonly configService: ConfigService) {
++    this.adminCode = this.configService.get<string>('ADMIN_CODE') || 'ADMIN123';
++  }
++
++  validateAdminCode(code: string): boolean {
++    if (!code || code !== this.adminCode) {
++      this.logger.warn(`Invalid admin code attempt: ${code}`);
++      throw new UnauthorizedException('Invalid admin code');
++    }
++    return true;
++  }
++}
+diff --git a/src/auth/swagger-auth.controller.ts b/src/auth/swagger-auth.controller.ts
+new file mode 100644
+index 0000000..f03454d
+--- /dev/null
++++ b/src/auth/swagger-auth.controller.ts
+@@ -0,0 +1,48 @@
++import {
++  Controller,
++  Get,
++  Query,
++  Res,
++  UnauthorizedException,
++} from '@nestjs/common';
++import type { Response } from 'express';
++import { SwaggerAuthService } from './swagger-auth.service';
++import { ApiTags, ApiOperation, ApiQuery, ApiResponse } from '@nestjs/swagger';
++
++@ApiTags('swagger-auth')
++@Controller('swagger-auth')
++export class SwaggerAuthController {
++  constructor(private readonly swaggerAuthService: SwaggerAuthService) {}
++
++  @Get('verify')
++  @ApiOperation({ summary: 'Verify admin code for Swagger access' })
++  @ApiQuery({ name: 'code', description: 'Admin access code', required: true })
++  @ApiResponse({ status: 200, description: 'Access granted' })
++  @ApiResponse({ status: 401, description: 'Invalid access code' })
++  verifyAccess(@Query('code') code: string, @Res() res: Response) {
++    try {
++      this.swaggerAuthService.validateSwaggerAccess(code);
++
++      res.cookie('swagger-auth', 'authenticated', {
++        httpOnly: true,
++        secure: process.env.NODE_ENV === 'production',
++        maxAge: 24 * 60 * 60 * 1000, // 24 hours
++        sameSite: 'strict',
++      });
++
++      res.redirect('/api');
++    } catch (error) {
++      if (error instanceof UnauthorizedException) {
++        res.status(401).json({
++          message: 'Invalid access code',
++          error: 'Unauthorized',
++        });
++      } else {
++        res.status(500).json({
++          message: 'Internal server error',
++          error: 'Internal Server Error',
++        });
++      }
++    }
++  }
++}
+diff --git a/src/auth/swagger-auth.middleware.ts b/src/auth/swagger-auth.middleware.ts
+new file mode 100644
+index 0000000..925a39b
+--- /dev/null
++++ b/src/auth/swagger-auth.middleware.ts
+@@ -0,0 +1,114 @@
++import {
++  Injectable,
++  NestMiddleware,
++  UnauthorizedException,
++} from '@nestjs/common';
++import { Request, Response, NextFunction } from 'express';
++import { ConfigService } from '@nestjs/config';
++
++@Injectable()
++export class SwaggerAuthMiddleware implements NestMiddleware {
++  private readonly adminCode: string;
++
++  constructor(private readonly configService: ConfigService) {
++    this.adminCode = this.configService.get<string>('ADMIN_CODE') || 'ADMIN123';
++  }
++
++  use(req: Request, res: Response, next: NextFunction) {
++    if (req.path.startsWith('/api') && req.path !== '/swagger-auth/verify') {
++      const authCookie = req.cookies['swagger-auth'];
++      const authHeader = req.headers.authorization;
++      const queryCode = req.query.code as string;
++
++      if (
++        authCookie === 'authenticated' ||
++        authHeader === `Bearer ${this.adminCode}` ||
++        queryCode === this.adminCode
++      ) {
++        return next();
++      }
++
++      if (req.path === '/api' || req.path === '/api/') {
++        return res.status(401).send(`
++          <!DOCTYPE html>
++          <html>
++            <head>
++              <title>API Documentation Access</title>
++              <style>
++                body { 
++                  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
++                  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
++                  margin: 0; 
++                  padding: 0; 
++                  display: flex; 
++                  justify-content: center; 
++                  align-items: center; 
++                  min-height: 100vh;
++                }
++                .container { 
++                  background: white; 
++                  padding: 40px; 
++                  border-radius: 16px; 
++                  box-shadow: 0 20px 40px rgba(0,0,0,0.1);
++                  text-align: center;
++                  max-width: 400px;
++                  width: 90%;
++                }
++                h1 { color: #2d3748; margin-bottom: 20px; }
++                p { color: #4a5568; margin-bottom: 30px; }
++                .form-group { margin-bottom: 20px; }
++                input { 
++                  width: 100%; 
++                  padding: 12px; 
++                  border: 2px solid #e2e8f0; 
++                  border-radius: 8px; 
++                  font-size: 16px;
++                  box-sizing: border-box;
++                }
++                input:focus { 
++                  outline: none; 
++                  border-color: #667eea; 
++                }
++                button { 
++                  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
++                  color: white; 
++                  border: none; 
++                  padding: 12px 30px; 
++                  border-radius: 8px; 
++                  font-size: 16px; 
++                  cursor: pointer;
++                  width: 100%;
++                }
++                button:hover { opacity: 0.9; }
++                .error { color: #e53e3e; margin-top: 10px; }
++              </style>
++            </head>
++            <body>
++              <div class="container">
++                <h1>🔐 API Documentation Access</h1>
++                <p>Enter the admin code to access the API documentation:</p>
++                <form action="/swagger-auth/verify" method="GET">
++                  <div class="form-group">
++                    <input type="password" name="code" placeholder="Enter admin code" required>
++                  </div>
++                  <button type="submit">Access Documentation</button>
++                </form>
++                <div class="error" id="error"></div>
++              </div>
++              <script>
++                const urlParams = new URLSearchParams(window.location.search);
++                if (urlParams.get('error') === 'unauthorized') {
++                  document.getElementById('error').textContent = 'Invalid access code. Please try again.';
++                }
++              </script>
++            </body>
++          </html>
++        `);
++      }
++
++      throw new UnauthorizedException('Access denied to API documentation');
++    }
++
++    next();
++  }
++}
+diff --git a/src/auth/swagger-auth.service.ts b/src/auth/swagger-auth.service.ts
+new file mode 100644
+index 0000000..e13e5f3
+--- /dev/null
++++ b/src/auth/swagger-auth.service.ts
+@@ -0,0 +1,25 @@
++import { Injectable, UnauthorizedException, Logger } from '@nestjs/common';
++import { ConfigService } from '@nestjs/config';
++
++@Injectable()
++export class SwaggerAuthService {
++  private readonly logger = new Logger(SwaggerAuthService.name);
++  private readonly adminCode: string;
++
++  constructor(private readonly configService: ConfigService) {
++    this.adminCode = this.configService.get<string>('ADMIN_CODE') || 'ADMIN123';
++  }
++
++  validateSwaggerAccess(code: string): boolean {
++    if (!code || code !== this.adminCode) {
++      this.logger.warn(
++        `Unauthorized Swagger access attempt with code: ${code}`,
++      );
++      throw new UnauthorizedException(
++        'Invalid access code for API documentation',
++      );
++    }
++    this.logger.log('Authorized Swagger access granted');
++    return true;
++  }
++}
+diff --git a/src/constants/prompt.ts b/src/constants/prompt.ts
+index 5b96ae0..530140b 100644
+--- a/src/constants/prompt.ts
++++ b/src/constants/prompt.ts
+@@ -1,9 +1,21 @@
+-export const LEARNING_PROMPT = `
+-Generate a daily learning topic for a software developer, choosing from one of the following specialized areas: **React, NestJS, System Design, DSA, Career Growth & Developer Paths, or Job Switch & Interview Prep**.
++export const LEARNING_PROMPT = (previousContent?: string[]) => `
++Generate a NEW and UNIQUE daily learning topic for a software developer, choosing from one of the following specialized areas: **React, System Design, Core JavaScript, Backend Development, or Interview Preparation**.
++
++${
++  previousContent && previousContent.length > 0
++    ? `
++**IMPORTANT - PREVIOUS CONTENT TO AVOID:**
++The following topics have been generated recently. DO NOT generate similar or duplicate content:
++${previousContent.map((content, index) => `${index + 1}. ${content}`).join('\n')}
++
++Please ensure your new topic is completely different and offers fresh insights.
++`
++    : ''
++}
+ 
+ The generated topic must be:
+ 1.  **Insightful & Deep**: Go beyond basic definitions. Explain the "why" behind the concept, including its trade-offs, common use cases, and impact on application architecture or career trajectory.
+-2.  **Best-Practice Aligned**: For React and NestJS, ensure all information and code examples strictly follow the **official documentation**. For career topics, cite established industry principles.
++2.  **Best-Practice Aligned**: For React and backend technologies, ensure all information and code examples strictly follow the **official documentation**. For career topics, cite established industry principles.
+ 3.  **Practical & Actionable**: Include high-quality, commented code snippets, concrete design walkthroughs, or a structured list of actionable steps a developer can immediately take.
+ 4.  **Targeted**: Be suitable for a developer aiming to build intermediate to advanced skills and accelerate their career.
+ 
+@@ -12,30 +24,40 @@ The generated topic must be:
+ ### **Topic-Specific Directives**
+ 
+ * **For a React Topic:**
+-    * **API/Patterns:** Focus on a core concept like a specific Hook useReducer, state management patterns, or performance optimization React.memo.
+-    * **Core Internals:** Dive into how React works under the hood. Cover topics like the **Virtual DOM**, the **Reconciliation/Diffing Algorithm**, the **React Fiber architecture**, or the concurrent rendering scheduler. Explain how understanding these internals helps in writing more performant applications.
+-
+-* **For a NestJS Topic:** Focus on a key architectural element like Dependency Injection, Modules, Pipes, or Guards. Explain how the concept enhances code organization, scalability, and testability, citing principles from the official NestJS documentation.
+-
+-* **For a System Design Topic:** Choose a fundamental principle like **Load Balancing**, **Caching Strategies**, **Database Sharding**, or a pattern like **API Gateway**. Analyze the trade-offs of different implementation choices.
+-
+-* **For a DSA Topic:** Select a specific data structure or algorithm. You must explain its logic, provide its **Time and Space Complexity** (Big O notation), and present a relevant problem (e.g., from LeetCode) with a clear, commented solution in JavaScript or TypeScript.
+-
+-* **For a Career Growth & Developer Path Topic:**
+-    * Generate a strategic roadmap or actionable advice for long-term growth.
+-    * Topics could include: "The Path from Mid-Level to Senior Engineer," "Developing T-Shaped Skills," "How to Effectively Mentor Juniors," or "Building a Public Profile as a Developer (Blogging/Open Source)."
+-    * Provide a structured plan with milestones and key skills (both technical and soft) to acquire at each stage.
+-
+-* **For a Job Switch & Interview Prep Topic:**
+-    * Provide focused, tactical advice for someone actively looking for a new role.
+-    * Topics could include: "How to Refactor a Resume to Pass ATS Scans," "Building a Standout Portfolio Project in 30 Days," "A 2-Week Strategy for System Design Interviews," or "Mastering Behavioral Questions with the STAR Method."
+-    * Offer concrete examples, templates, and checklists.
++    * **Modern React Patterns:** Focus on React 18+ features like Concurrent Rendering, Suspense, Server Components, or advanced hooks patterns.
++    * **Performance Optimization:** Cover React.memo, useMemo, useCallback, code splitting, lazy loading, and bundle optimization.
++    * **State Management:** Explore Context API, Redux Toolkit, Zustand, or Jotai for complex state scenarios.
++    * **Core Internals:** Dive into Virtual DOM, Reconciliation Algorithm, React Fiber, or the new concurrent features.
++
++* **For a System Design Topic:**
++    * **Scalability Patterns:** Load balancing strategies, horizontal vs vertical scaling, microservices architecture.
++    * **Data Management:** Database sharding, replication, caching strategies (Redis, Memcached), CDN implementation.
++    * **Communication:** API Gateway patterns, message queues, event-driven architecture, gRPC vs REST.
++    * **Real-world Systems:** Design Twitter, Uber, Netflix, or WhatsApp-like systems with trade-offs analysis.
++
++* **For a Core JavaScript Topic:**
++    * **Advanced Concepts:** Closures, prototypes, event loop, memory management, garbage collection.
++    * **Modern ES6+ Features:** Async/await, generators, modules, destructuring, template literals, optional chaining.
++    * **Performance:** V8 engine internals, optimization techniques, memory leaks prevention.
++    * **Functional Programming:** Higher-order functions, currying, composition, immutability patterns.
++
++* **For a Backend Development Topic:**
++    * **API Design:** RESTful principles, GraphQL implementation, API versioning, rate limiting.
++    * **Database Design:** Normalization, indexing strategies, query optimization, NoSQL vs SQL.
++    * **Security:** Authentication (JWT, OAuth), authorization, input validation, CORS, CSRF protection.
++    * **DevOps & Deployment:** Docker containerization, CI/CD pipelines, monitoring, logging strategies.
++
++* **For an Interview Preparation Topic:**
++    * **Technical Interviews:** Coding problem-solving strategies, algorithm complexity analysis, system design preparation.
++    * **Behavioral Questions:** STAR method, leadership examples, conflict resolution, project management.
++    * **Portfolio Building:** GitHub best practices, open source contributions, technical blogging.
++    * **Career Strategy:** Salary negotiation, job search optimization, networking, skill development roadmap.
+ 
+ ---
+ 
+ ### **Required Response Format**
+ 
+-**Topic Area:** [React | NestJS | System Design | DSA | Career Growth | Interview Prep]
++**Topic Area:** [React | System Design | Core JavaScript | Backend Development | Interview Preparation]
+ **Title:** [A Clear and Engaging Title for the Concept]
+ 
+ **📄 Description:**
+diff --git a/src/content/content.module.ts b/src/content/content.module.ts
+new file mode 100644
+index 0000000..44fe766
+--- /dev/null
++++ b/src/content/content.module.ts
+@@ -0,0 +1,13 @@
++import { Module } from '@nestjs/common';
++import { MongooseModule } from '@nestjs/mongoose';
++import { ContentService } from './content.service';
++import { Content, ContentSchema } from './schemas/content.schema';
++
++@Module({
++  imports: [
++    MongooseModule.forFeature([{ name: Content.name, schema: ContentSchema }]),
++  ],
++  providers: [ContentService],
++  exports: [ContentService],
++})
++export class ContentModule {}
+diff --git a/src/content/content.service.ts b/src/content/content.service.ts
+new file mode 100644
+index 0000000..daf08cd
+--- /dev/null
++++ b/src/content/content.service.ts
+@@ -0,0 +1,78 @@
++import { Injectable, Logger } from '@nestjs/common';
++import { InjectModel } from '@nestjs/mongoose';
++import { Content } from './schemas/content.schema';
++import { Model } from 'mongoose';
++
++@Injectable()
++export class ContentService {
++  private readonly logger = new Logger(ContentService.name);
++
++  constructor(
++    @InjectModel(Content.name) private contentModel: Model<Content>,
++  ) {}
++
++  async saveContent(
++    title: string,
++    content: string,
++    topicArea: string,
++  ): Promise<Content> {
++    try {
++      const newContent = new this.contentModel({
++        title,
++        content,
++        topicArea,
++        generatedAt: new Date(),
++        isUsed: false,
++      });
++
++      const savedContent = await newContent.save();
++      this.logger.log(`Content saved: ${title}`);
++      return savedContent;
++    } catch (error) {
++      this.logger.error('Error saving content:', error);
++      throw error;
++    }
++  }
++
++  async getRecentContent(limit: number = 5): Promise<Content[]> {
++    try {
++      const recentContent = await this.contentModel
++        .find({ isUsed: true })
++        .sort({ generatedAt: -1 })
++        .limit(limit)
++        .lean();
++
++      return recentContent;
++    } catch (error) {
++      this.logger.error('Error fetching recent content:', error);
++      return [];
++    }
++  }
++
++  async markContentAsUsed(contentId: string): Promise<void> {
++    try {
++      await this.contentModel.findByIdAndUpdate(contentId, { isUsed: true });
++      this.logger.log(`Content marked as used: ${contentId}`);
++    } catch (error) {
++      this.logger.error('Error marking content as used:', error);
++    }
++  }
++
++  async getContentByTopicArea(
++    topicArea: string,
++    limit: number = 3,
++  ): Promise<Content[]> {
++    try {
++      const content = await this.contentModel
++        .find({ topicArea, isUsed: true })
++        .sort({ generatedAt: -1 })
++        .limit(limit)
++        .lean();
++
++      return content;
++    } catch (error) {
++      this.logger.error('Error fetching content by topic area:', error);
++      return [];
++    }
++  }
++}
+diff --git a/src/content/schemas/content.schema.ts b/src/content/schemas/content.schema.ts
+new file mode 100644
+index 0000000..e4d6751
+--- /dev/null
++++ b/src/content/schemas/content.schema.ts
+@@ -0,0 +1,24 @@
++import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
++import { HydratedDocument } from 'mongoose';
++
++export type ContentDocument = HydratedDocument<Content>;
++
++@Schema({ timestamps: true })
++export class Content {
++  @Prop({ required: true })
++  title: string;
++
++  @Prop({ required: true })
++  content: string;
++
++  @Prop({ required: true })
++  topicArea: string;
++
++  @Prop({ required: true })
++  generatedAt: Date;
++
++  @Prop({ default: false })
++  isUsed: boolean;
++}
++
++export const ContentSchema = SchemaFactory.createForClass(Content);
+diff --git a/src/email/email.service.ts b/src/email/email.service.ts
+index 0a02709..aa055c4 100644
+--- a/src/email/email.service.ts
++++ b/src/email/email.service.ts
+@@ -32,50 +32,326 @@ export class EmailService {
+       return false;
+     }
+   }
+-  private simpleMarkdownToHtml(markdown: string): string {
+-    return markdown
++  private enhancedMarkdownToHtml(markdown: string): string {
++    let html = markdown
++      .replace(
++        /\*\*Topic Area:\*\*\s*\[([^\]]+)\]/g,
++        '<h2>🎯 Topic Area: $1</h2>',
++      )
++      .replace(/\*\*Title:\*\*\s*\[([^\]]+)\]/g, '<h2>📖 $1</h2>')
++      .replace(/\*\*📄 Description:\*\*/g, '<h3>📄 Description</h3>')
++      .replace(
++        /\*\*🧠 Key Concepts & Insights:\*\*/g,
++        '<h3>🧠 Key Concepts & Insights</h3>',
++      )
++      .replace(
++        /\*\*🚀 Actionable Steps \/ Code Example:\*\*/g,
++        '<h3>🚀 Actionable Steps / Code Example</h3>',
++      )
++      .replace(/\*\*📚 Further Reading:\*\*/g, '<h3>📚 Further Reading</h3>')
+       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+-      .replace(/^\*\*(.*?):\*\*/gm, '<h4>$1:</h4>')
+-      .replace(/(\p{Emoji})\s*\*\*(.*?):\*\*/gu, '<h4>$1 $2:</h4>')
+-      .split('\n')
+-      .map((line) => line.trim())
+-      .filter((line) => line)
+-      .map((line) => `<p>${line}</p>`)
+-      .join('')
+-      .replace(/<p><h4>(.*?)<\/h4><\/p>/g, '<h4>$1</h4>');
++      .replace(/`([^`]+)`/g, '<code>$1</code>')
++      .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
++      .replace(/^\* (.*$)/gm, '<li>$1</li>')
++      .replace(/^\d+\. (.*$)/gm, '<li>$1</li>')
++      .replace(/\n\n/g, '</p><p>')
++      .replace(/^(.*)$/gm, '<p>$1</p>')
++      .replace(/<p><h[2-6]>/g, '<h2>')
++      .replace(/<p><h[2-6]>/g, '<h3>')
++      .replace(/<p><h[2-6]>/g, '<h4>')
++      .replace(/<\/h[2-6]><\/p>/g, '</h2>')
++      .replace(/<\/h[2-6]><\/p>/g, '</h3>')
++      .replace(/<\/h[2-6]><\/p>/g, '</h4>')
++      .replace(/<p><li>/g, '<li>')
++      .replace(/<\/li><\/p>/g, '</li>')
++      .replace(/<p><ul>/g, '<ul>')
++      .replace(/<p><ol>/g, '<ol>')
++      .replace(/<\/ul><\/p>/g, '</ul>')
++      .replace(/<\/ol><\/p>/g, '</ol>')
++      .replace(/<p><pre>/g, '<pre>')
++      .replace(/<\/pre><\/p>/g, '</pre>')
++      .replace(/<p><code>/g, '<code>')
++      .replace(/<\/code><\/p>/g, '</code>')
++      .replace(/<p>\s*<\/p>/g, '')
++      .replace(/<li><\/li>/g, '');
++
++    const listItems = html.match(/<li>.*?<\/li>/g);
++    if (listItems && listItems.length > 0) {
++      const listStart = html.indexOf('<li>');
++      const listEnd = html.lastIndexOf('</li>') + 6;
++      const listContent = html.substring(listStart, listEnd);
++      const isOrdered =
++        listContent.includes('1.') ||
++        listContent.includes('2.') ||
++        listContent.includes('3.');
++      const listTag = isOrdered ? 'ol' : 'ul';
++      html =
++        html.substring(0, listStart) +
++        `<${listTag}>${listContent}</${listTag}>` +
++        html.substring(listEnd);
++    }
++
++    return html;
+   }
+ 
+   private formatEmailContent(content: string): string {
+-    const formattedContent = this.simpleMarkdownToHtml(content);
++    const formattedContent = this.enhancedMarkdownToHtml(content);
+ 
+     return `
+       <!DOCTYPE html>
+       <html>
+         <head>
+           <meta charset="utf-8">
++          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+           <title>Daily Learning Topic</title>
+           <style>
+-            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; }
+-            .container { max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 8px; }
+-            .header { background: #4A90E2; color: white; padding: 15px; text-align: center; border-radius: 8px 8px 0 0; }
+-            .content { padding: 25px; background: #ffffff; }
+-            .content h4 { font-size: 18px; color: #4A90E2; margin-top: 20px; margin-bottom: 10px; }
+-            .content p { margin-bottom: 10px; }
+-            .content strong { color: #222; }
+-            .footer { text-align: center; padding: 20px; font-size: 12px; color: #777; }
++            * { 
++              margin: 0; 
++              padding: 0; 
++              box-sizing: border-box; 
++            }
++            body { 
++              font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; 
++              line-height: 1.7; 
++              color: #ffffff; 
++              background: #0a0a0a;
++              padding: 20px;
++              min-height: 100vh;
++            }
++            .container { 
++              max-width: 700px; 
++              margin: 0 auto; 
++              background: #111111; 
++              border-radius: 20px; 
++              box-shadow: 0 20px 40px rgba(0, 212, 255, 0.1);
++              overflow: hidden;
++              border: 1px solid #27272a;
++            }
++            .header { 
++              background: linear-gradient(135deg, #00d4ff 0%, #7c3aed 100%);
++              color: white; 
++              padding: 40px 30px; 
++              text-align: center; 
++              position: relative;
++              overflow: hidden;
++            }
++            .header::before {
++              content: '';
++              position: absolute;
++              top: 0;
++              left: 0;
++              right: 0;
++              bottom: 0;
++              background: radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.1) 0%, transparent 50%),
++                          radial-gradient(circle at 80% 20%, rgba(255, 255, 255, 0.1) 0%, transparent 50%);
++              pointer-events: none;
++            }
++            .header h1 { 
++              font-size: 28px; 
++              font-weight: 900; 
++              margin-bottom: 8px;
++              text-shadow: 0 2px 4px rgba(0,0,0,0.3);
++              position: relative;
++              z-index: 1;
++            }
++            .header p {
++              font-size: 16px;
++              opacity: 0.9;
++              position: relative;
++              z-index: 1;
++            }
++            .content { 
++              padding: 40px 30px; 
++              background: #111111; 
++              color: #ffffff;
++              word-wrap: break-word;
++              overflow-wrap: break-word;
++            }
++            .content h2 { 
++              font-size: 24px; 
++              color: #00d4ff; 
++              margin: 30px 0 15px 0;
++              font-weight: 700;
++              border-left: 4px solid #00d4ff;
++              padding-left: 15px;
++              display: flex;
++              align-items: center;
++            }
++            .content h3 { 
++              font-size: 20px; 
++              color: #a1a1aa; 
++              margin: 25px 0 12px 0;
++              font-weight: 600;
++              display: flex;
++              align-items: center;
++            }
++            .content h4 { 
++              font-size: 18px; 
++              color: #7c3aed; 
++              margin: 20px 0 10px 0;
++              font-weight: 600;
++              display: flex;
++              align-items: center;
++            }
++            .content p { 
++              margin-bottom: 16px; 
++              font-size: 16px;
++              color: #a1a1aa;
++              word-wrap: break-word;
++              overflow-wrap: break-word;
++            }
++            .content strong { 
++              color: #ffffff; 
++              font-weight: 600;
++            }
++            .content code {
++              background: #1a1a1a;
++              padding: 4px 8px;
++              border-radius: 6px;
++              font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
++              font-size: 14px;
++              color: #00d4ff;
++              border: 1px solid #27272a;
++              word-wrap: break-word;
++              overflow-wrap: break-word;
++            }
++            .content pre {
++              background: #0a0a0a;
++              color: #ffffff;
++              padding: 20px;
++              border-radius: 12px;
++              overflow-x: auto;
++              margin: 20px 0;
++              font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
++              font-size: 14px;
++              line-height: 1.5;
++              border: 1px solid #27272a;
++              word-wrap: break-word;
++              overflow-wrap: break-word;
++            }
++            .content pre code {
++              background: transparent;
++              border: none;
++              padding: 0;
++              color: inherit;
++            }
++            .content ul, .content ol {
++              margin: 16px 0;
++              padding-left: 25px;
++            }
++            .content li {
++              margin-bottom: 8px;
++              color: #a1a1aa;
++              word-wrap: break-word;
++              overflow-wrap: break-word;
++            }
++            .content blockquote {
++              border-left: 4px solid #00d4ff;
++              background: #1a1a1a;
++              padding: 20px;
++              margin: 20px 0;
++              border-radius: 0 12px 12px 0;
++              font-style: italic;
++              color: #a1a1aa;
++            }
++            .content a {
++              color: #00d4ff;
++              text-decoration: none;
++              word-wrap: break-word;
++              overflow-wrap: break-word;
++            }
++            .content a:hover {
++              text-decoration: underline;
++            }
++            .footer { 
++              text-align: center; 
++              padding: 30px; 
++              background: #0a0a0a;
++              border-top: 1px solid #27272a;
++            }
++            .footer p {
++              color: #71717a;
++              font-size: 14px;
++              margin-bottom: 8px;
++            }
++            .footer .brand {
++              font-weight: 600;
++              color: #ffffff;
++            }
++            .emoji {
++              font-size: 1.2em;
++              margin-right: 8px;
++            }
++            .topic-badge {
++              display: inline-block;
++              background: linear-gradient(135deg, #00d4ff, #7c3aed);
++              color: white;
++              padding: 4px 12px;
++              border-radius: 20px;
++              font-size: 12px;
++              font-weight: 600;
++              margin-bottom: 10px;
++            }
++            .highlight-box {
++              background: rgba(0, 212, 255, 0.1);
++              border: 1px solid rgba(0, 212, 255, 0.3);
++              border-radius: 12px;
++              padding: 20px;
++              margin: 20px 0;
++            }
++            @media (max-width: 600px) {
++              body { 
++                padding: 10px; 
++                font-size: 14px;
++              }
++              .container { 
++                margin: 0; 
++                border-radius: 12px;
++              }
++              .header, .content, .footer { 
++                padding: 20px; 
++              }
++              .header h1 { 
++                font-size: 24px; 
++              }
++              .content h2 { 
++                font-size: 20px; 
++              }
++              .content h3 { 
++                font-size: 18px; 
++              }
++              .content pre {
++                padding: 15px;
++                font-size: 12px;
++              }
++            }
++            @media (max-width: 480px) {
++              .content {
++                padding: 15px;
++              }
++              .header {
++                padding: 25px 15px;
++              }
++              .footer {
++                padding: 20px 15px;
++              }
++            }
+           </style>
+         </head>
+         <body>
+           <div class="container">
+             <div class="header">
+-              <h1>📚 Daily Learning Topic</h1>
++              <h1><span class="emoji">📚</span>Daily Learning Topic</h1>
++              <p>Your daily dose of technical knowledge</p>
+             </div>
+             <div class="content">
+               ${formattedContent}
+             </div>
+             <div class="footer">
+-              <p>Happy Learning! 🚀</p>
+-              <p><small>Learning Notifier - Your daily dose of knowledge</small></p>
++              <p>Happy Learning! <span class="emoji">🚀</span></p>
++              <p class="brand">Learning Notifier</p>
++              <p><small>Empowering developers with daily insights</small></p>
++              <p><small>Built with ❤️ by developers, for developers</small></p>
+             </div>
+           </div>
+         </body>
+diff --git a/src/main.ts b/src/main.ts
+index 27ca2e0..b9c0c27 100644
+--- a/src/main.ts
++++ b/src/main.ts
+@@ -7,10 +7,16 @@ import { NestFactory } from '@nestjs/core';
+ import { AppModule } from './app.module';
+ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+ import { ValidationPipe } from '@nestjs/common';
++import cookieParser from 'cookie-parser';
++import { join } from 'path';
++import { NestExpressApplication } from '@nestjs/platform-express';
++import * as express from 'express';
+ 
+ async function bootstrap() {
+   try {
+-    const app = await NestFactory.create(AppModule);
++    const app = await NestFactory.create<NestExpressApplication>(AppModule);
++
++    app.use(cookieParser());
+ 
+     app.useGlobalPipes(
+       new ValidationPipe({
+@@ -20,14 +26,20 @@ async function bootstrap() {
+       }),
+     );
+ 
++    app.useStaticAssets(join(__dirname, '..', 'views'));
++    app.setBaseViewsDir(join(__dirname, '..', 'views'));
++    app.setViewEngine('html');
++
+     const config = new DocumentBuilder()
+       .setTitle('Learning Notifier')
+       .setDescription(
+         'Learning Notifier API - Daily learning topics for developers',
+       )
+       .setVersion('1.0')
++      .addTag('home', 'Home page and UI endpoints')
+       .addTag('registration', 'User registration endpoints')
+       .addTag('notifications', 'Notification management endpoints')
++      .addTag('swagger-auth', 'Swagger authentication endpoints')
+       .build();
+ 
+     const document = SwaggerModule.createDocument(app, config);
+diff --git a/src/notify/notify.service.ts b/src/notify/notify.service.ts
+index fa966d4..a6bdce5 100644
+--- a/src/notify/notify.service.ts
++++ b/src/notify/notify.service.ts
+@@ -19,7 +19,7 @@ export class NotifyService {
+   async createNotification() {
+     try {
+       this.logger.log('Starting daily notification process...');
+-      const topic = await this.topicService.generateContent(LEARNING_PROMPT);
++      const topic = await this.topicService.generateContent();
+       if (!topic) {
+         this.logger.error('Failed to generate learning topic');
+         return;
+diff --git a/src/register/dto/user.dto.ts b/src/register/dto/user.dto.ts
+index c29e9be..7ff9f19 100644
+--- a/src/register/dto/user.dto.ts
++++ b/src/register/dto/user.dto.ts
+@@ -1,4 +1,10 @@
+-import { IsEmail, IsString, IsNotEmpty, IsOptional } from 'class-validator';
++import {
++  IsEmail,
++  IsString,
++  IsNotEmpty,
++  IsOptional,
++  IsBoolean,
++} from 'class-validator';
+ import { ApiProperty } from '@nestjs/swagger';
+ 
+ export class RegisterDTO {
+@@ -22,4 +28,22 @@ export class RegisterDTO {
+   @IsString()
+   @IsOptional()
+   type?: string;
++
++  @ApiProperty({
++    description: 'Admin code for admin operations',
++    example: 'ADMIN123',
++    required: false,
++  })
++  @IsString()
++  @IsOptional()
++  adminCode?: string;
++
++  @ApiProperty({
++    description: 'Whether user is admin',
++    example: false,
++    required: false,
++  })
++  @IsBoolean()
++  @IsOptional()
++  isAdmin?: boolean;
+ }
+diff --git a/src/register/register.controller.ts b/src/register/register.controller.ts
+index 5100822..b3dad15 100644
+--- a/src/register/register.controller.ts
++++ b/src/register/register.controller.ts
+@@ -19,8 +19,12 @@ export class RegisterController {
+   @Get()
+   @ApiOperation({ summary: 'Get all registered users' })
+   @ApiResponse({ status: 200, description: 'List of all users' })
+-  find() {
+-    return this.registerService.findAll();
++  @ApiResponse({
++    status: 401,
++    description: 'Unauthorized - Admin code required',
++  })
++  find(@Body() body: { adminCode?: string }) {
++    return this.registerService.findAll(body.adminCode);
+   }
+ 
+   @Post()
+@@ -51,7 +55,11 @@ export class RegisterController {
+   @ApiOperation({ summary: 'Delete user by ID' })
+   @ApiResponse({ status: 200, description: 'User deleted successfully' })
+   @ApiResponse({ status: 404, description: 'User not found' })
+-  delete(@Param('id') id: string) {
+-    return this.registerService.delete(id);
++  @ApiResponse({
++    status: 401,
++    description: 'Unauthorized - Admin code required',
++  })
++  delete(@Param('id') id: string, @Body() body: { adminCode?: string }) {
++    return this.registerService.delete(id, body.adminCode);
+   }
+ }
+diff --git a/src/register/register.module.ts b/src/register/register.module.ts
+index dc9b691..4d6b1a6 100644
+--- a/src/register/register.module.ts
++++ b/src/register/register.module.ts
+@@ -3,10 +3,12 @@ import { RegisterService } from './register.service';
+ import { RegisterController } from './register.controller';
+ import { MongooseModule } from '@nestjs/mongoose';
+ import { User, UserSchema } from './schemas/user.schema';
++import { AdminAuthModule } from '../auth/admin-auth.module';
+ 
+ @Module({
+   imports: [
+     MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
++    AdminAuthModule,
+   ],
+   providers: [RegisterService],
+   controllers: [RegisterController],
+diff --git a/src/register/register.service.ts b/src/register/register.service.ts
+index 1ae71c9..e7b2250 100644
+--- a/src/register/register.service.ts
++++ b/src/register/register.service.ts
+@@ -3,23 +3,28 @@ import {
+   Injectable,
+   Logger,
+   NotFoundException,
++  UnauthorizedException,
+ } from '@nestjs/common';
+ import { RegisterDTO } from './dto/user.dto';
+ import { InjectModel } from '@nestjs/mongoose';
+ import { User } from './schemas/user.schema';
+ import { Model } from 'mongoose';
++import { AdminAuthService } from '../auth/admin-auth.service';
+ 
+ @Injectable()
+ export class RegisterService {
+   private readonly logger = new Logger(RegisterService.name);
+ 
+-  constructor(@InjectModel(User.name) private userModel: Model<User>) {}
++  constructor(
++    @InjectModel(User.name) private userModel: Model<User>,
++    private readonly adminAuthService: AdminAuthService,
++  ) {}
+ 
+   async register(
+     registerDTO: RegisterDTO,
+   ): Promise<{ message: string; user: any }> {
+     try {
+-      const { name, email, type } = registerDTO;
++      const { name, email, type, adminCode, isAdmin } = registerDTO;
+ 
+       if (!email || !email.includes('@')) {
+         throw new BadRequestException('Valid email address is required');
+@@ -29,6 +34,16 @@ export class RegisterService {
+         throw new BadRequestException('Name is required');
+       }
+ 
++      if (isAdmin && !adminCode) {
++        throw new BadRequestException(
++          'Admin code is required for admin registration',
++        );
++      }
++
++      if (isAdmin && adminCode) {
++        this.adminAuthService.validateAdminCode(adminCode);
++      }
++
+       this.logger.log(`Attempting to register user: ${email}`);
+ 
+       const existingUser = await this.findByEmail(email);
+@@ -41,6 +56,7 @@ export class RegisterService {
+         name: name.trim(),
+         email: email.toLowerCase().trim(),
+         type: type?.trim() || 'developer',
++        isAdmin: isAdmin || false,
+       });
+ 
+       const savedUser = await newUser.save();
+@@ -53,25 +69,36 @@ export class RegisterService {
+           _id: savedUser._id,
+           name: savedUser.name,
+           email: savedUser.email,
++          isAdmin: savedUser.isAdmin,
+         },
+       };
+     } catch (error) {
+       this.logger.error(`Registration failed for ${registerDTO.email}:`, error);
+-      if (error instanceof BadRequestException) {
++      if (
++        error instanceof BadRequestException ||
++        error instanceof UnauthorizedException
++      ) {
+         throw error;
+       }
+       throw new BadRequestException('Registration failed. Please try again.');
+     }
+   }
+ 
+-  async findAll(): Promise<User[]> {
++  async findAll(adminCode?: string): Promise<User[]> {
+     try {
++      if (adminCode) {
++        this.adminAuthService.validateAdminCode(adminCode);
++      }
++
+       this.logger.log('Fetching all users...');
+       const users = await this.userModel.find().select('-__v').lean();
+       this.logger.log(`Found ${users.length} users`);
+       return users;
+     } catch (error) {
+       this.logger.error('Error fetching users:', error);
++      if (error instanceof UnauthorizedException) {
++        throw error;
++      }
+       throw new BadRequestException('Failed to fetch users');
+     }
+   }
+@@ -109,7 +136,11 @@ export class RegisterService {
+         throw new BadRequestException('Valid user ID is required');
+       }
+ 
+-      const { name, email, type } = registerDTO;
++      const { name, email, type, adminCode, isAdmin } = registerDTO;
++
++      if (adminCode) {
++        this.adminAuthService.validateAdminCode(adminCode);
++      }
+ 
+       if (email && !email.includes('@')) {
+         throw new BadRequestException('Valid email address is required');
+@@ -125,6 +156,7 @@ export class RegisterService {
+       if (name) updateData.name = name.trim();
+       if (email) updateData.email = email.toLowerCase().trim();
+       if (type) updateData.type = type.trim();
++      if (isAdmin !== undefined) updateData.isAdmin = isAdmin;
+ 
+       const user = await this.userModel
+         .findByIdAndUpdate(id, updateData, { new: true, runValidators: true })
+@@ -142,7 +174,8 @@ export class RegisterService {
+       this.logger.error(`Error updating user ${id}:`, error);
+       if (
+         error instanceof BadRequestException ||
+-        error instanceof NotFoundException
++        error instanceof NotFoundException ||
++        error instanceof UnauthorizedException
+       ) {
+         throw error;
+       }
+@@ -150,12 +183,16 @@ export class RegisterService {
+     }
+   }
+ 
+-  async delete(id: string): Promise<{ message: string }> {
++  async delete(id: string, adminCode?: string): Promise<{ message: string }> {
+     try {
+       if (!id || id.trim().length === 0) {
+         throw new BadRequestException('Valid user ID is required');
+       }
+ 
++      if (adminCode) {
++        this.adminAuthService.validateAdminCode(adminCode);
++      }
++
+       this.logger.log(`Deleting user with ID: ${id}`);
+       const user = await this.userModel.findByIdAndDelete(id);
+ 
+@@ -172,7 +209,8 @@ export class RegisterService {
+       this.logger.error(`Error deleting user ${id}:`, error);
+       if (
+         error instanceof BadRequestException ||
+-        error instanceof NotFoundException
++        error instanceof NotFoundException ||
++        error instanceof UnauthorizedException
+       ) {
+         throw error;
+       }
+diff --git a/src/register/schemas/user.schema.ts b/src/register/schemas/user.schema.ts
+index 32bc069..094e755 100644
+--- a/src/register/schemas/user.schema.ts
++++ b/src/register/schemas/user.schema.ts
+@@ -8,6 +8,10 @@ export class User {
+   name: string;
+   @Prop()
+   email: string;
++  @Prop()
++  type?: string;
++  @Prop({ default: false })
++  isAdmin: boolean;
+ }
+ 
+ export const UserSchema = SchemaFactory.createForClass(User);
+diff --git a/src/topics/topics.module.ts b/src/topics/topics.module.ts
+index ebb1473..d4c2a3f 100644
+--- a/src/topics/topics.module.ts
++++ b/src/topics/topics.module.ts
+@@ -1,7 +1,9 @@
+ import { Module } from '@nestjs/common';
+ import { TopicsService } from './topics.service';
++import { ContentModule } from '../content/content.module';
+ 
+ @Module({
++  imports: [ContentModule],
+   providers: [TopicsService],
+   exports: [TopicsService],
+ })
+diff --git a/src/topics/topics.service.ts b/src/topics/topics.service.ts
+index cd3b477..fa3d8b7 100644
+--- a/src/topics/topics.service.ts
++++ b/src/topics/topics.service.ts
+@@ -1,6 +1,8 @@
+ import { Injectable, Logger } from '@nestjs/common';
+ import { ConfigService } from '@nestjs/config';
+ import { GoogleGenerativeAI } from '@google/generative-ai';
++import { ContentService } from '../content/content.service';
++import { LEARNING_PROMPT } from '../constants/prompt';
+ 
+ @Injectable()
+ export class TopicsService {
+@@ -8,24 +10,50 @@ export class TopicsService {
+ 
+   private readonly logger = new Logger(TopicsService.name);
+ 
+-  constructor(private readonly configService: ConfigService) {
++  constructor(
++    private readonly configService: ConfigService,
++    private readonly contentService: ContentService,
++  ) {
+     this.genAI = new GoogleGenerativeAI(
+       this.configService.get<string>('GEMINI_API_KEY') as string,
+     );
+   }
+ 
+-  async generateContent(prompt: string): Promise<string> {
++  async generateContent(prompt?: string): Promise<string> {
+     try {
+       this.logger.log('Generating learning topic');
++
++      const recentContent = await this.contentService.getRecentContent(5);
++      const previousTitles = recentContent.map((content) => content.title);
++
++      const enhancedPrompt = LEARNING_PROMPT(previousTitles);
++
+       const model = this.genAI.getGenerativeModel({
+         model: 'gemini-2.5-flash',
+       });
+-      const result = await model.generateContent(prompt);
++      const result = await model.generateContent(enhancedPrompt);
+       const response = await result.response;
+-      return response.text();
++      const generatedContent = response.text();
++
++      const topicArea = this.extractTopicArea(generatedContent);
++      const title = this.extractTitle(generatedContent);
++
++      await this.contentService.saveContent(title, generatedContent, topicArea);
++
++      return generatedContent;
+     } catch (error) {
+       this.logger.error('Error generating topic:', error.message);
+       throw error;
+     }
+   }
++
++  private extractTopicArea(content: string): string {
++    const topicAreaMatch = content.match(/\*\*Topic Area:\*\*\s*\[([^\]]+)\]/);
++    return topicAreaMatch ? topicAreaMatch[1].trim() : 'General';
++  }
++
++  private extractTitle(content: string): string {
++    const titleMatch = content.match(/\*\*Title:\*\*\s*\[([^\]]+)\]/);
++    return titleMatch ? titleMatch[1].trim() : 'Daily Learning Topic';
++  }
+ }
+diff --git a/views/api-docs.html b/views/api-docs.html
+new file mode 100644
+index 0000000..b4d4ed4
+--- /dev/null
++++ b/views/api-docs.html
+@@ -0,0 +1,586 @@
++<!DOCTYPE html>
++<html lang="en">
++<head>
++    <meta charset="UTF-8">
++    <meta name="viewport" content="width=device-width, initial-scale=1.0">
++    <title>API Documentation - Learning Notifier</title>
++    <meta name="description" content="Complete API documentation for Learning Notifier - Daily developer insights API">
++    <link rel="preconnect" href="https://fonts.googleapis.com">
++    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
++    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
++    <link rel="stylesheet" href="styles/main.css">
++    <style>
++        .api-hero {
++            background: linear-gradient(135deg, var(--bg-secondary), var(--bg-tertiary));
++            padding: 8rem 2rem 4rem;
++            text-align: center;
++        }
++        
++        .api-hero h1 {
++            font-size: 3.5rem;
++            font-weight: 900;
++            margin-bottom: 1rem;
++            background: linear-gradient(135deg, var(--primary), var(--secondary));
++            -webkit-background-clip: text;
++            -webkit-text-fill-color: transparent;
++            background-clip: text;
++        }
++        
++        .api-hero p {
++            font-size: 1.25rem;
++            color: var(--text-secondary);
++            max-width: 600px;
++            margin: 0 auto 2rem;
++        }
++        
++        .api-nav {
++            display: flex;
++            gap: 1rem;
++            justify-content: center;
++            flex-wrap: wrap;
++        }
++        
++        .api-nav a {
++            padding: 0.75rem 1.5rem;
++            background: var(--bg-tertiary);
++            border: 1px solid var(--border);
++            border-radius: 8px;
++            color: var(--text-secondary);
++            text-decoration: none;
++            transition: all 0.3s ease;
++        }
++        
++        .api-nav a:hover {
++            background: var(--primary);
++            color: white;
++            transform: translateY(-2px);
++        }
++        
++        .code-block {
++            background: var(--bg-primary);
++            border: 1px solid var(--border);
++            border-radius: 8px;
++            padding: 1rem;
++            margin: 1rem 0;
++            position: relative;
++            overflow-x: auto;
++        }
++        
++        .code-block code {
++            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
++            color: var(--text-primary);
++            font-size: 0.875rem;
++            line-height: 1.5;
++        }
++        
++        .copy-code {
++            position: absolute;
++            top: 0.5rem;
++            right: 0.5rem;
++            background: var(--bg-tertiary);
++            border: 1px solid var(--border);
++            border-radius: 4px;
++            padding: 0.25rem 0.5rem;
++            color: var(--text-secondary);
++            font-size: 0.75rem;
++            cursor: pointer;
++            transition: all 0.3s ease;
++        }
++        
++        .copy-code:hover {
++            background: var(--primary);
++            color: white;
++        }
++        
++        .response-example {
++            background: var(--bg-primary);
++            border-left: 4px solid var(--success);
++            padding: 1rem;
++            margin: 1rem 0;
++            border-radius: 0 8px 8px 0;
++        }
++        
++        .error-example {
++            background: var(--bg-primary);
++            border-left: 4px solid var(--error);
++            padding: 1rem;
++            margin: 1rem 0;
++            border-radius: 0 8px 8px 0;
++        }
++    </style>
++</head>
++<body>
++    <div class="bg-animation"></div>
++
++    <!-- Header -->
++    <header class="header" id="header">
++        <nav class="nav">
++            <a href="/" class="logo">
++                <div class="logo-icon">📚</div>
++                Learning Notifier
++            </a>
++            <ul class="nav-links">
++                <li><a href="/">Home</a></li>
++                <li><a href="/#features">Features</a></li>
++                <li><a href="/#register">Register</a></li>
++                <li><a href="/api" target="_blank">Swagger UI</a></li>
++            </ul>
++        </nav>
++    </header>
++
++    <!-- API Hero Section -->
++    <section class="api-hero">
++        <div class="container">
++            <h1>API Documentation</h1>
++            <p>Complete reference for Learning Notifier API endpoints, authentication, and usage examples.</p>
++            <div class="api-nav">
++                <a href="#authentication">Authentication</a>
++                <a href="#endpoints">Endpoints</a>
++                <a href="#examples">Examples</a>
++                <a href="#errors">Error Codes</a>
++                <a href="/api" target="_blank">Interactive Docs</a>
++            </div>
++        </div>
++    </section>
++
++    <!-- API Documentation -->
++    <section class="api-docs">
++        <div class="api-container">
++            <!-- Authentication Section -->
++            <div id="authentication" class="api-section">
++                <h2 class="section-title">Authentication</h2>
++                <p class="api-description">
++                    Learning Notifier API uses admin code authentication for protected endpoints. 
++                    Regular endpoints are public, but admin operations require a valid admin code.
++                </p>
++                
++                <div class="api-endpoint">
++                    <div class="api-header">
++                        <span class="method post">POST</span>
++                        <span class="endpoint-path">/swagger-auth/verify</span>
++                    </div>
++                    <div class="api-body">
++                        <p class="api-description">Verify admin code for Swagger UI access</p>
++                        <div class="api-params">
++                            <h4>Query Parameters:</h4>
++                            <table class="param-table">
++                                <thead>
++                                    <tr>
++                                        <th>Parameter</th>
++                                        <th>Type</th>
++                                        <th>Required</th>
++                                        <th>Description</th>
++                                    </tr>
++                                </thead>
++                                <tbody>
++                                    <tr>
++                                        <td><span class="param-name">code</span></td>
++                                        <td><span class="param-type">string</span></td>
++                                        <td>Yes</td>
++                                        <td>Admin authentication code</td>
++                                    </tr>
++                                </tbody>
++                            </table>
++                        </div>
++                    </div>
++                </div>
++            </div>
++
++            <!-- Registration Endpoints -->
++            <div id="endpoints" class="api-section">
++                <h2 class="section-title">Registration Endpoints</h2>
++                
++                <div class="api-endpoint">
++                    <div class="api-header">
++                        <span class="method post">POST</span>
++                        <span class="endpoint-path">/register</span>
++                    </div>
++                    <div class="api-body">
++                        <p class="api-description">Register a new user for daily learning notifications</p>
++                        <div class="api-params">
++                            <h4>Request Body:</h4>
++                            <table class="param-table">
++                                <thead>
++                                    <tr>
++                                        <th>Parameter</th>
++                                        <th>Type</th>
++                                        <th>Required</th>
++                                        <th>Description</th>
++                                    </tr>
++                                </thead>
++                                <tbody>
++                                    <tr>
++                                        <td><span class="param-name">name</span></td>
++                                        <td><span class="param-type">string</span></td>
++                                        <td>Yes</td>
++                                        <td>User's full name</td>
++                                    </tr>
++                                    <tr>
++                                        <td><span class="param-name">email</span></td>
++                                        <td><span class="param-type">string</span></td>
++                                        <td>Yes</td>
++                                        <td>User's email address</td>
++                                    </tr>
++                                    <tr>
++                                        <td><span class="param-name">type</span></td>
++                                        <td><span class="param-type">string</span></td>
++                                        <td>No</td>
++                                        <td>Developer type (developer, frontend, backend, fullstack, student, other)</td>
++                                    </tr>
++                                    <tr>
++                                        <td><span class="param-name">isAdmin</span></td>
++                                        <td><span class="param-type">boolean</span></td>
++                                        <td>No</td>
++                                        <td>Whether user is an admin</td>
++                                    </tr>
++                                    <tr>
++                                        <td><span class="param-name">adminCode</span></td>
++                                        <td><span class="param-type">string</span></td>
++                                        <td>If isAdmin=true</td>
++                                        <td>Admin authentication code</td>
++                                    </tr>
++                                </tbody>
++                            </table>
++                        </div>
++                        
++                        <h4>Example Request:</h4>
++                        <div class="code-block">
++                            <button class="copy-code">Copy</button>
++                            <code>{
++  "name": "John Doe",
++  "email": "john@example.com",
++  "type": "developer",
++  "isAdmin": false
++}</code>
++                        </div>
++                        
++                        <h4>Success Response (200):</h4>
++                        <div class="response-example">
++                            <code>{
++  "message": "Registration completed successfully",
++  "user": {
++    "_id": "64f1a2b3c4d5e6f7g8h9i0j1",
++    "name": "John Doe",
++    "email": "john@example.com",
++    "type": "developer",
++    "isAdmin": false
++  }
++}</code>
++                        </div>
++                    </div>
++                </div>
++
++                <div class="api-endpoint">
++                    <div class="api-header">
++                        <span class="method get">GET</span>
++                        <span class="endpoint-path">/register</span>
++                    </div>
++                    <div class="api-body">
++                        <p class="api-description">Get all registered users (Admin only)</p>
++                        <div class="api-params">
++                            <h4>Request Body:</h4>
++                            <table class="param-table">
++                                <thead>
++                                    <tr>
++                                        <th>Parameter</th>
++                                        <th>Type</th>
++                                        <th>Required</th>
++                                        <th>Description</th>
++                                    </tr>
++                                </thead>
++                                <tbody>
++                                    <tr>
++                                        <td><span class="param-name">adminCode</span></td>
++                                        <td><span class="param-type">string</span></td>
++                                        <td>Yes</td>
++                                        <td>Admin authentication code</td>
++                                    </tr>
++                                </tbody>
++                            </table>
++                        </div>
++                    </div>
++                </div>
++
++                <div class="api-endpoint">
++                    <div class="api-header">
++                        <span class="method get">GET</span>
++                        <span class="endpoint-path">/register/:id</span>
++                    </div>
++                    <div class="api-body">
++                        <p class="api-description">Get a specific user by ID (Admin only)</p>
++                        <div class="api-params">
++                            <h4>Path Parameters:</h4>
++                            <table class="param-table">
++                                <thead>
++                                    <tr>
++                                        <th>Parameter</th>
++                                        <th>Type</th>
++                                        <th>Required</th>
++                                        <th>Description</th>
++                                    </tr>
++                                </thead>
++                                <tbody>
++                                    <tr>
++                                        <td><span class="param-name">id</span></td>
++                                        <td><span class="param-type">string</span></td>
++                                        <td>Yes</td>
++                                        <td>User's MongoDB ObjectId</td>
++                                    </tr>
++                                </tbody>
++                            </table>
++                        </div>
++                    </div>
++                </div>
++
++                <div class="api-endpoint">
++                    <div class="api-header">
++                        <span class="method put">PUT</span>
++                        <span class="endpoint-path">/register/:id</span>
++                    </div>
++                    <div class="api-body">
++                        <p class="api-description">Update a user (Admin only)</p>
++                        <div class="api-params">
++                            <h4>Request Body:</h4>
++                            <table class="param-table">
++                                <thead>
++                                    <tr>
++                                        <th>Parameter</th>
++                                        <th>Type</th>
++                                        <th>Required</th>
++                                        <th>Description</th>
++                                    </tr>
++                                </thead>
++                                <tbody>
++                                    <tr>
++                                        <td><span class="param-name">name</span></td>
++                                        <td><span class="param-type">string</span></td>
++                                        <td>No</td>
++                                        <td>Updated user name</td>
++                                    </tr>
++                                    <tr>
++                                        <td><span class="param-name">email</span></td>
++                                        <td><span class="param-type">string</span></td>
++                                        <td>No</td>
++                                        <td>Updated email address</td>
++                                    </tr>
++                                    <tr>
++                                        <td><span class="param-name">type</span></td>
++                                        <td><span class="param-type">string</span></td>
++                                        <td>No</td>
++                                        <td>Updated developer type</td>
++                                    </tr>
++                                    <tr>
++                                        <td><span class="param-name">adminCode</span></td>
++                                        <td><span class="param-type">string</span></td>
++                                        <td>Yes</td>
++                                        <td>Admin authentication code</td>
++                                    </tr>
++                                </tbody>
++                            </table>
++                        </div>
++                    </div>
++                </div>
++
++                <div class="api-endpoint">
++                    <div class="api-header">
++                        <span class="method delete">DELETE</span>
++                        <span class="endpoint-path">/register/:id</span>
++                    </div>
++                    <div class="api-body">
++                        <p class="api-description">Delete a user (Admin only)</p>
++                        <div class="api-params">
++                            <h4>Request Body:</h4>
++                            <table class="param-table">
++                                <thead>
++                                    <tr>
++                                        <th>Parameter</th>
++                                        <th>Type</th>
++                                        <th>Required</th>
++                                        <th>Description</th>
++                                    </tr>
++                                </thead>
++                                <tbody>
++                                    <tr>
++                                        <td><span class="param-name">adminCode</span></td>
++                                        <td><span class="param-type">string</span></td>
++                                        <td>Yes</td>
++                                        <td>Admin authentication code</td>
++                                    </tr>
++                                </tbody>
++                            </table>
++                        </div>
++                    </div>
++                </div>
++            </div>
++
++            <!-- Notification Endpoints -->
++            <div class="api-section">
++                <h2 class="section-title">Notification Endpoints</h2>
++                
++                <div class="api-endpoint">
++                    <div class="api-header">
++                        <span class="method post">POST</span>
++                        <span class="endpoint-path">/notify/test</span>
++                    </div>
++                    <div class="api-body">
++                        <p class="api-description">Send a test notification to a specific user</p>
++                        <div class="api-params">
++                            <h4>Request Body:</h4>
++                            <table class="param-table">
++                                <thead>
++                                    <tr>
++                                        <th>Parameter</th>
++                                        <th>Type</th>
++                                        <th>Required</th>
++                                        <th>Description</th>
++                                    </tr>
++                                </thead>
++                                <tbody>
++                                    <tr>
++                                        <td><span class="param-name">email</span></td>
++                                        <td><span class="param-type">string</span></td>
++                                        <td>Yes</td>
++                                        <td>Email address to send test notification</td>
++                                    </tr>
++                                </tbody>
++                            </table>
++                        </div>
++                    </div>
++                </div>
++
++                <div class="api-endpoint">
++                    <div class="api-header">
++                        <span class="method post">POST</span>
++                        <span class="endpoint-path">/notify/trigger</span>
++                    </div>
++                    <div class="api-body">
++                        <p class="api-description">Trigger daily notifications for all users</p>
++                        <div class="api-params">
++                            <h4>Request Body:</h4>
++                            <p>No parameters required</p>
++                        </div>
++                    </div>
++                </div>
++            </div>
++
++            <!-- Health Check -->
++            <div class="api-section">
++                <h2 class="section-title">System Endpoints</h2>
++                
++                <div class="api-endpoint">
++                    <div class="api-header">
++                        <span class="method get">GET</span>
++                        <span class="endpoint-path">/app/health</span>
++                    </div>
++                    <div class="api-body">
++                        <p class="api-description">Check API health status</p>
++                        <h4>Success Response (200):</h4>
++                        <div class="response-example">
++                            <code>{
++  "status": "ok",
++  "message": "Learning Notifier API is running",
++  "timestamp": "2024-01-15T10:30:00.000Z",
++  "version": "1.0.0"
++}</code>
++                        </div>
++                    </div>
++                </div>
++            </div>
++
++            <!-- Error Codes -->
++            <div id="errors" class="api-section">
++                <h2 class="section-title">Error Codes</h2>
++                
++                <div class="api-endpoint">
++                    <div class="api-body">
++                        <table class="param-table">
++                            <thead>
++                                <tr>
++                                    <th>Status Code</th>
++                                    <th>Error Type</th>
++                                    <th>Description</th>
++                                </tr>
++                            </thead>
++                            <tbody>
++                                <tr>
++                                    <td>400</td>
++                                    <td>Bad Request</td>
++                                    <td>Invalid request parameters or missing required fields</td>
++                                </tr>
++                                <tr>
++                                    <td>401</td>
++                                    <td>Unauthorized</td>
++                                    <td>Invalid admin code or missing authentication</td>
++                                </tr>
++                                <tr>
++                                    <td>404</td>
++                                    <td>Not Found</td>
++                                    <td>Resource not found (user, endpoint, etc.)</td>
++                                </tr>
++                                <tr>
++                                    <td>409</td>
++                                    <td>Conflict</td>
++                                    <td>Resource already exists (duplicate email)</td>
++                                </tr>
++                                <tr>
++                                    <td>500</td>
++                                    <td>Internal Server Error</td>
++                                    <td>Server-side error occurred</td>
++                                </tr>
++                            </tbody>
++                        </table>
++                        
++                        <h4>Example Error Response:</h4>
++                        <div class="error-example">
++                            <code>{
++  "statusCode": 400,
++  "message": "User with this email already exists",
++  "error": "Bad Request"
++}</code>
++                        </div>
++                    </div>
++                </div>
++            </div>
++        </div>
++    </section>
++
++    <!-- Footer -->
++    <footer class="footer">
++        <div class="footer-content">
++            <div class="footer-section">
++                <h3>Learning Notifier</h3>
++                <p>Daily AI-powered learning topics for developers</p>
++                <div class="social-links">
++                    <a href="https://github.com/yourusername/learning-notifier" class="social-link" target="_blank">
++                        <span>📱</span>
++                    </a>
++                    <a href="https://twitter.com/yourusername" class="social-link" target="_blank">
++                        <span>🐦</span>
++                    </a>
++                    <a href="https://linkedin.com/in/yourusername" class="social-link" target="_blank">
++                        <span>💼</span>
++                    </a>
++                </div>
++            </div>
++            <div class="footer-section">
++                <h3>API</h3>
++                <a href="/api" target="_blank">Swagger UI</a>
++                <a href="#authentication">Authentication</a>
++                <a href="#endpoints">Endpoints</a>
++                <a href="#errors">Error Codes</a>
++            </div>
++            <div class="footer-section">
++                <h3>Resources</h3>
++                <a href="https://github.com/yourusername/learning-notifier" target="_blank">GitHub Repository</a>
++                <a href="https://github.com/yourusername/learning-notifier/issues" target="_blank">Report Issues</a>
++                <a href="https://github.com/yourusername/learning-notifier/discussions" target="_blank">Discussions</a>
++            </div>
++        </div>
++        <div class="footer-bottom">
++            <p>&copy; 2024 Learning Notifier. Empowering developers with daily insights.</p>
++        </div>
++    </footer>
++
++    <script src="js/main.js"></script>
++</body>
++</html>
+diff --git a/views/index.html b/views/index.html
+new file mode 100644
+index 0000000..06eaa6f
+--- /dev/null
++++ b/views/index.html
+@@ -0,0 +1,245 @@
++<!DOCTYPE html>
++<html lang="en">
++<head>
++    <meta charset="UTF-8">
++    <meta name="viewport" content="width=device-width, initial-scale=1.0">
++    <title>Learning Notifier - Daily Developer Insights</title>
++    <meta name="description" content="Get daily learning topics for React, System Design, Core JavaScript, Backend Development, and Interview Prep. Powered by AI.">
++    <link rel="preconnect" href="https://fonts.googleapis.com">
++    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
++    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
++    <link rel="stylesheet" href="styles/main.css">
++</head>
++<body>
++    <div class="bg-animation"></div>
++
++    <!-- Header -->
++    <header class="header" id="header">
++        <nav class="nav">
++            <a href="/" class="logo">
++                <div class="logo-icon">📚</div>
++                Learning Notifier
++            </a>
++            <ul class="nav-links">
++                <li><a href="#features">Features</a></li>
++                <li><a href="#register">Register</a></li>
++                <li><a href="/docs">API Docs</a></li>
++                <li><a href="/api" target="_blank">Swagger UI</a></li>
++            </ul>
++        </nav>
++    </header>
++
++    <!-- Hero Section -->
++    <section class="hero">
++        <div class="hero-container">
++            <div class="hero-content">
++                <h1 class="fade-in-up">Daily Developer Insights</h1>
++                <p class="fade-in-up stagger-1">Get personalized learning topics powered by AI. Master React, System Design, Core JavaScript, Backend Development, and Interview Prep with daily curated content.</p>
++                <div class="hero-buttons fade-in-up stagger-2">
++                    <a href="#register" class="btn btn-primary">
++                        <span>🚀</span>
++                        Start Learning
++                    </a>
++                    <a href="/docs" class="btn btn-secondary">
++                        <span>📖</span>
++                        View API Docs
++                    </a>
++                </div>
++            </div>
++            <div class="hero-visual">
++                <div class="floating-card">
++                    <div class="card-icon">⚛️</div>
++                    <div class="card-title">React Mastery</div>
++                    <div class="card-desc">Advanced patterns & hooks</div>
++                </div>
++                <div class="floating-card">
++                    <div class="card-icon">🏗️</div>
++                    <div class="card-title">System Design</div>
++                    <div class="card-desc">Scalable architectures</div>
++                </div>
++                <div class="floating-card">
++                    <div class="card-icon">💻</div>
++                    <div class="card-title">Core JavaScript</div>
++                    <div class="card-desc">Deep language insights</div>
++                </div>
++            </div>
++        </div>
++    </section>
++
++    <!-- Features Section -->
++    <section class="features" id="features">
++        <div class="container">
++            <div class="section-header">
++                <h2 class="section-title">Why Choose Learning Notifier?</h2>
++                <p class="section-subtitle">Empowering developers with cutting-edge learning experiences</p>
++            </div>
++            <div class="features-grid">
++                <div class="feature-card">
++                    <div class="feature-icon">🤖</div>
++                    <h3 class="feature-title">AI-Powered Content</h3>
++                    <p class="feature-desc">Advanced AI generates unique, personalized learning topics daily. No more repetitive content - every day brings fresh insights.</p>
++                </div>
++                <div class="feature-card">
++                    <div class="feature-icon">🎯</div>
++                    <h3 class="feature-title">Focused Learning</h3>
++                    <p class="feature-desc">Specialized topics in React, System Design, Core JavaScript, Backend Development, and Interview Preparation.</p>
++                </div>
++                <div class="feature-card">
++                    <div class="feature-icon">📧</div>
++                    <h3 class="feature-title">Daily Notifications</h3>
++                    <p class="feature-desc">Automated daily emails at 9 AM with beautifully formatted content. Never miss your learning opportunity.</p>
++                </div>
++                <div class="feature-card">
++                    <div class="feature-icon">🔒</div>
++                    <h3 class="feature-title">Secure & Private</h3>
++                    <p class="feature-desc">Admin-protected API with secure authentication. Your data and access are always protected.</p>
++                </div>
++                <div class="feature-card">
++                    <div class="feature-icon">📊</div>
++                    <h3 class="feature-title">Content Tracking</h3>
++                    <p class="feature-desc">Smart content storage prevents duplicates and tracks your learning journey with detailed analytics.</p>
++                </div>
++                <div class="feature-card">
++                    <div class="feature-icon">⚡</div>
++                    <h3 class="feature-title">Modern Tech Stack</h3>
++                    <p class="feature-desc">Built with NestJS, MongoDB, and cutting-edge technologies for reliability and performance.</p>
++                </div>
++            </div>
++        </div>
++    </section>
++
++    <!-- Registration Section -->
++    <section class="registration" id="register">
++        <div class="container">
++            <div class="section-header">
++                <h2 class="section-title">Join Our Learning Community</h2>
++                <p class="section-subtitle">Start your journey to becoming a better developer today</p>
++            </div>
++            <div class="registration-container">
++                <div class="success-message" id="successMessage">
++                    <strong>🎉 Registration Successful!</strong><br>
++                    Welcome to Learning Notifier! You'll start receiving daily learning topics soon.
++                </div>
++                <div class="error-message" id="errorMessage">
++                    <strong>❌ Registration Failed</strong><br>
++                    <span id="errorText">Please check your information and try again.</span>
++                </div>
++                
++                <form id="registrationForm">
++                    <div class="form-group">
++                        <label for="name">Full Name *</label>
++                        <input type="text" id="name" name="name" placeholder="Enter your full name" required>
++                    </div>
++                    
++                    <div class="form-group">
++                        <label for="email">Email Address *</label>
++                        <input type="email" id="email" name="email" placeholder="Enter your email address" required>
++                    </div>
++                    
++                    <div class="form-group">
++                        <label for="type">Developer Type</label>
++                        <select id="type" name="type">
++                            <option value="developer">Developer</option>
++                            <option value="frontend">Frontend Developer</option>
++                            <option value="backend">Backend Developer</option>
++                            <option value="fullstack">Full Stack Developer</option>
++                            <option value="student">Student</option>
++                            <option value="other">Other</option>
++                        </select>
++                    </div>
++                    
++                    <div class="checkbox-group">
++                        <input type="checkbox" id="isAdmin" name="isAdmin">
++                        <label for="isAdmin">I am an admin (requires admin code)</label>
++                    </div>
++                    
++                    <div class="form-group" id="adminCodeGroup" style="display: none;">
++                        <label for="adminCode">Admin Code *</label>
++                        <input type="password" id="adminCode" name="adminCode" placeholder="Enter admin code">
++                    </div>
++                    
++                    <button type="submit" class="btn-register" id="registerBtn">
++                        <span>🚀</span>
++                        Register for Daily Learning
++                    </button>
++                    
++                    <div class="loading" id="loading">
++                        <div class="spinner"></div>
++                        Registering you...
++                    </div>
++                </form>
++            </div>
++        </div>
++    </section>
++
++    <!-- Stats Section -->
++    <section class="stats">
++        <div class="container">
++            <div class="stats-grid">
++                <div class="stat-item">
++                    <div class="stat-number">5+</div>
++                    <div class="stat-label">Learning Areas</div>
++                </div>
++                <div class="stat-item">
++                    <div class="stat-number">24/7</div>
++                    <div class="stat-label">AI Content Generation</div>
++                </div>
++                <div class="stat-item">
++                    <div class="stat-number">100%</div>
++                    <div class="stat-label">Unique Content</div>
++                </div>
++                <div class="stat-item">
++                    <div class="stat-number">9 AM</div>
++                    <div class="stat-label">Daily Delivery</div>
++                </div>
++            </div>
++        </div>
++    </section>
++
++    <!-- Footer -->
++    <footer class="footer">
++        <div class="footer-content">
++            <div class="footer-section">
++                <h3>Learning Notifier</h3>
++                <p>Daily AI-powered learning topics for developers</p>
++                <div class="social-links">
++                    <a href="https://github.com/yourusername/learning-notifier" class="social-link" target="_blank" title="GitHub Repository">
++                        <span>📱</span>
++                    </a>
++                    <a href="https://twitter.com/yourusername" class="social-link" target="_blank" title="Follow on Twitter">
++                        <span>🐦</span>
++                    </a>
++                    <a href="https://linkedin.com/in/yourusername" class="social-link" target="_blank" title="Connect on LinkedIn">
++                        <span>💼</span>
++                    </a>
++                </div>
++            </div>
++            <div class="footer-section">
++                <h3>Quick Links</h3>
++                <a href="#features">Features</a>
++                <a href="#register">Register</a>
++                <a href="/docs">API Documentation</a>
++                <a href="/api" target="_blank">Swagger UI</a>
++            </div>
++            <div class="footer-section">
++                <h3>Resources</h3>
++                <a href="https://github.com/yourusername/learning-notifier" target="_blank">GitHub Repository</a>
++                <a href="https://github.com/yourusername/learning-notifier/issues" target="_blank">Report Issues</a>
++                <a href="https://github.com/yourusername/learning-notifier/discussions" target="_blank">Discussions</a>
++                <a href="https://github.com/yourusername/learning-notifier/blob/main/README.md" target="_blank">Documentation</a>
++            </div>
++            <div class="footer-section">
++                <h3>Contact</h3>
++                <p>Built with ❤️ by developers</p>
++                <p>Open source and community-driven</p>
++                <a href="mailto:contact@learningnotifier.com">contact@learningnotifier.com</a>
++            </div>
++        </div>
++        <div class="footer-bottom">
++            <p>&copy; 2024 Learning Notifier. Empowering developers with daily insights.</p>
++        </div>
++    </footer>
++
++    <script src="js/main.js"></script>
++</body>
++</html>
+\ No newline at end of file
+diff --git a/views/js/main.js b/views/js/main.js
+new file mode 100644
+index 0000000..0b9589a
+--- /dev/null
++++ b/views/js/main.js
+@@ -0,0 +1,337 @@
++// Main JavaScript functionality for Learning Notifier
++
++class LearningNotifier {
++    constructor() {
++        this.init();
++    }
++
++    init() {
++        this.setupNavigation();
++        this.setupScrollEffects();
++        this.setupAnimations();
++        this.setupRegistrationForm();
++        this.setupApiDocs();
++    }
++
++    // Navigation functionality
++    setupNavigation() {
++        // Smooth scrolling for navigation links
++        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
++            anchor.addEventListener('click', function (e) {
++                e.preventDefault();
++                const target = document.querySelector(this.getAttribute('href'));
++                if (target) {
++                    target.scrollIntoView({
++                        behavior: 'smooth',
++                        block: 'start'
++                    });
++                }
++            });
++        });
++
++        // Mobile menu toggle (if needed)
++        this.setupMobileMenu();
++    }
++
++    setupMobileMenu() {
++        // Add mobile menu functionality if needed
++        const mobileMenuBtn = document.getElementById('mobile-menu-btn');
++        const mobileMenu = document.getElementById('mobile-menu');
++
++        if (mobileMenuBtn && mobileMenu) {
++            mobileMenuBtn.addEventListener('click', () => {
++                mobileMenu.classList.toggle('active');
++            });
++        }
++    }
++
++    // Scroll effects
++    setupScrollEffects() {
++        // Header scroll effect
++        window.addEventListener('scroll', () => {
++            const header = document.getElementById('header');
++            if (window.scrollY > 100) {
++                header.classList.add('scrolled');
++            } else {
++                header.classList.remove('scrolled');
++            }
++        });
++    }
++
++    // Animation setup
++    setupAnimations() {
++        // Intersection Observer for animations
++        const observerOptions = {
++            threshold: 0.1,
++            rootMargin: '0px 0px -50px 0px'
++        };
++
++        const observer = new IntersectionObserver((entries) => {
++            entries.forEach(entry => {
++                if (entry.isIntersecting) {
++                    entry.target.style.opacity = '1';
++                    entry.target.style.transform = 'translateY(0)';
++                }
++            });
++        }, observerOptions);
++
++        // Observe all feature cards and stat items
++        document.querySelectorAll('.feature-card, .stat-item, .api-endpoint').forEach(el => {
++            el.style.opacity = '0';
++            el.style.transform = 'translateY(30px)';
++            el.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
++            observer.observe(el);
++        });
++    }
++
++    // Registration form functionality
++    setupRegistrationForm() {
++        const registrationForm = document.getElementById('registrationForm');
++        if (!registrationForm) return;
++
++        const isAdminCheckbox = document.getElementById('isAdmin');
++        const adminCodeGroup = document.getElementById('adminCodeGroup');
++        const adminCodeInput = document.getElementById('adminCode');
++        const successMessage = document.getElementById('successMessage');
++        const errorMessage = document.getElementById('errorMessage');
++        const errorText = document.getElementById('errorText');
++        const loading = document.getElementById('loading');
++        const registerBtn = document.getElementById('registerBtn');
++
++        // Toggle admin code field
++        if (isAdminCheckbox && adminCodeGroup) {
++            isAdminCheckbox.addEventListener('change', function () {
++                if (this.checked) {
++                    adminCodeGroup.style.display = 'block';
++                    if (adminCodeInput) adminCodeInput.required = true;
++                } else {
++                    adminCodeGroup.style.display = 'none';
++                    if (adminCodeInput) {
++                        adminCodeInput.required = false;
++                        adminCodeInput.value = '';
++                    }
++                }
++            });
++        }
++
++        // Form submission
++        registrationForm.addEventListener('submit', async function (e) {
++            e.preventDefault();
++
++            // Hide previous messages
++            if (successMessage) successMessage.style.display = 'none';
++            if (errorMessage) errorMessage.style.display = 'none';
++
++            // Show loading state
++            if (loading) loading.style.display = 'block';
++            if (registerBtn) {
++                registerBtn.disabled = true;
++                registerBtn.innerHTML = '<span>⏳</span> Registering...';
++            }
++
++            try {
++                // Prepare form data
++                const formData = {
++                    name: document.getElementById('name').value.trim(),
++                    email: document.getElementById('email').value.trim(),
++                    type: document.getElementById('type').value,
++                    isAdmin: isAdminCheckbox ? isAdminCheckbox.checked : false
++                };
++
++                // Add admin code if admin is selected
++                if (formData.isAdmin && adminCodeInput) {
++                    formData.adminCode = adminCodeInput.value.trim();
++                }
++
++                // Make API request
++                const response = await fetch('/register', {
++                    method: 'POST',
++                    headers: {
++                        'Content-Type': 'application/json',
++                    },
++                    body: JSON.stringify(formData)
++                });
++
++                const result = await response.json();
++
++                if (response.ok) {
++                    // Success
++                    if (successMessage) {
++                        successMessage.style.display = 'block';
++                        successMessage.scrollIntoView({ behavior: 'smooth', block: 'center' });
++                    }
++                    registrationForm.reset();
++                    if (adminCodeGroup) adminCodeGroup.style.display = 'none';
++                    if (adminCodeInput) adminCodeInput.required = false;
++                } else {
++                    // Error
++                    if (errorText) {
++                        errorText.textContent = result.message || 'Registration failed. Please try again.';
++                    }
++                    if (errorMessage) {
++                        errorMessage.style.display = 'block';
++                        errorMessage.scrollIntoView({ behavior: 'smooth', block: 'center' });
++                    }
++                }
++            } catch (error) {
++                console.error('Registration error:', error);
++                if (errorText) {
++                    errorText.textContent = 'Network error. Please check your connection and try again.';
++                }
++                if (errorMessage) {
++                    errorMessage.style.display = 'block';
++                    errorMessage.scrollIntoView({ behavior: 'smooth', block: 'center' });
++                }
++            } finally {
++                // Hide loading state
++                if (loading) loading.style.display = 'none';
++                if (registerBtn) {
++                    registerBtn.disabled = false;
++                    registerBtn.innerHTML = '<span>🚀</span> Register for Daily Learning';
++                }
++            }
++        });
++
++        // Form validation
++        const inputs = registrationForm.querySelectorAll('input[required], select[required]');
++        inputs.forEach(input => {
++            input.addEventListener('blur', function () {
++                if (!this.value.trim()) {
++                    this.style.borderColor = 'var(--error)';
++                } else {
++                    this.style.borderColor = 'var(--border)';
++                }
++            });
++
++            input.addEventListener('input', function () {
++                if (this.value.trim()) {
++                    this.style.borderColor = 'var(--border)';
++                }
++            });
++        });
++    }
++
++    // API Documentation functionality
++    setupApiDocs() {
++        // Copy code functionality
++        document.querySelectorAll('.copy-code').forEach(button => {
++            button.addEventListener('click', function () {
++                const codeBlock = this.parentElement.querySelector('code');
++                if (codeBlock) {
++                    navigator.clipboard.writeText(codeBlock.textContent).then(() => {
++                        this.textContent = 'Copied!';
++                        setTimeout(() => {
++                            this.textContent = 'Copy';
++                        }, 2000);
++                    });
++                }
++            });
++        });
++
++        // API endpoint testing
++        this.setupApiTesting();
++    }
++
++    setupApiTesting() {
++        // Add API testing functionality if needed
++        const testButtons = document.querySelectorAll('.test-api');
++        testButtons.forEach(button => {
++            button.addEventListener('click', async function () {
++                const endpoint = this.dataset.endpoint;
++                const method = this.dataset.method;
++
++                try {
++                    const response = await fetch(endpoint, {
++                        method: method,
++                        headers: {
++                            'Content-Type': 'application/json',
++                        }
++                    });
++
++                    const result = await response.json();
++                    console.log('API Response:', result);
++
++                    // Show result in a modal or alert
++                    alert(`API Response: ${JSON.stringify(result, null, 2)}`);
++                } catch (error) {
++                    console.error('API Test Error:', error);
++                    alert('API Test Failed: ' + error.message);
++                }
++            });
++        });
++    }
++
++    // Utility methods
++    showNotification(message, type = 'info') {
++        // Create notification element
++        const notification = document.createElement('div');
++        notification.className = `notification notification-${type}`;
++        notification.textContent = message;
++
++        // Style the notification
++        Object.assign(notification.style, {
++            position: 'fixed',
++            top: '20px',
++            right: '20px',
++            padding: '1rem 1.5rem',
++            borderRadius: '8px',
++            color: 'white',
++            fontWeight: '600',
++            zIndex: '10000',
++            transform: 'translateX(100%)',
++            transition: 'transform 0.3s ease'
++        });
++
++        // Set background color based on type
++        const colors = {
++            success: '#10b981',
++            error: '#ef4444',
++            warning: '#f59e0b',
++            info: '#3b82f6'
++        };
++        notification.style.backgroundColor = colors[type] || colors.info;
++
++        // Add to page
++        document.body.appendChild(notification);
++
++        // Animate in
++        setTimeout(() => {
++            notification.style.transform = 'translateX(0)';
++        }, 100);
++
++        // Remove after 3 seconds
++        setTimeout(() => {
++            notification.style.transform = 'translateX(100%)';
++            setTimeout(() => {
++                document.body.removeChild(notification);
++            }, 300);
++        }, 3000);
++    }
++
++    // GitHub integration
++    openGitHub() {
++        window.open('https://github.com/yourusername/learning-notifier', '_blank');
++    }
++
++    // Social sharing
++    shareOnTwitter() {
++        const text = 'Check out Learning Notifier - Daily AI-powered learning topics for developers!';
++        const url = window.location.href;
++        const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
++        window.open(twitterUrl, '_blank');
++    }
++
++    shareOnLinkedIn() {
++        const url = window.location.href;
++        const linkedinUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`;
++        window.open(linkedinUrl, '_blank');
++    }
++}
++
++// Initialize the application when DOM is loaded
++document.addEventListener('DOMContentLoaded', () => {
++    new LearningNotifier();
++});
++
++// Export for use in other scripts
++window.LearningNotifier = LearningNotifier;
+diff --git a/views/styles/main.css b/views/styles/main.css
+new file mode 100644
+index 0000000..9371d5c
+--- /dev/null
++++ b/views/styles/main.css
+@@ -0,0 +1,789 @@
++:root {
++    --primary: #00d4ff;
++    --secondary: #7c3aed;
++    --accent: #f59e0b;
++    --success: #10b981;
++    --error: #ef4444;
++    --warning: #f59e0b;
++    --bg-primary: #0a0a0a;
++    --bg-secondary: #111111;
++    --bg-tertiary: #1a1a1a;
++    --text-primary: #ffffff;
++    --text-secondary: #a1a1aa;
++    --text-muted: #71717a;
++    --border: #27272a;
++    --border-light: #3f3f46;
++}
++
++* {
++    margin: 0;
++    padding: 0;
++    box-sizing: border-box;
++}
++
++body {
++    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
++    background: var(--bg-primary);
++    color: var(--text-primary);
++    line-height: 1.6;
++    overflow-x: hidden;
++}
++
++/* Animated Background */
++.bg-animation {
++    position: fixed;
++    top: 0;
++    left: 0;
++    width: 100%;
++    height: 100%;
++    z-index: -1;
++    background: radial-gradient(circle at 20% 50%, rgba(0, 212, 255, 0.1) 0%, transparent 50%),
++                radial-gradient(circle at 80% 20%, rgba(124, 58, 237, 0.1) 0%, transparent 50%),
++                radial-gradient(circle at 40% 80%, rgba(245, 158, 11, 0.1) 0%, transparent 50%);
++    animation: bgFloat 20s ease-in-out infinite;
++}
++
++@keyframes bgFloat {
++    0%, 100% { transform: translate(0, 0) rotate(0deg); }
++    33% { transform: translate(30px, -30px) rotate(120deg); }
++    66% { transform: translate(-20px, 20px) rotate(240deg); }
++}
++
++/* Glassmorphism Utility */
++.glass {
++    background: rgba(255, 255, 255, 0.05);
++    backdrop-filter: blur(20px);
++    border: 1px solid rgba(255, 255, 255, 0.1);
++}
++
++/* Header */
++.header {
++    position: fixed;
++    top: 0;
++    left: 0;
++    right: 0;
++    z-index: 1000;
++    padding: 1rem 0;
++    transition: all 0.3s ease;
++}
++
++.header.scrolled {
++    background: rgba(10, 10, 10, 0.8);
++    backdrop-filter: blur(20px);
++    border-bottom: 1px solid var(--border);
++}
++
++.nav {
++    max-width: 1200px;
++    margin: 0 auto;
++    padding: 0 2rem;
++    display: flex;
++    justify-content: space-between;
++    align-items: center;
++}
++
++.logo {
++    display: flex;
++    align-items: center;
++    gap: 0.75rem;
++    text-decoration: none;
++    color: var(--text-primary);
++    font-weight: 800;
++    font-size: 1.5rem;
++}
++
++.logo-icon {
++    width: 40px;
++    height: 40px;
++    background: linear-gradient(135deg, var(--primary), var(--secondary));
++    border-radius: 12px;
++    display: flex;
++    align-items: center;
++    justify-content: center;
++    font-size: 1.25rem;
++    box-shadow: 0 8px 32px rgba(0, 212, 255, 0.3);
++}
++
++.nav-links {
++    display: flex;
++    gap: 2rem;
++    list-style: none;
++}
++
++.nav-links a {
++    color: var(--text-secondary);
++    text-decoration: none;
++    font-weight: 500;
++    transition: all 0.3s ease;
++    position: relative;
++}
++
++.nav-links a:hover {
++    color: var(--primary);
++}
++
++.nav-links a::after {
++    content: '';
++    position: absolute;
++    bottom: -4px;
++    left: 0;
++    width: 0;
++    height: 2px;
++    background: var(--primary);
++    transition: width 0.3s ease;
++}
++
++.nav-links a:hover::after {
++    width: 100%;
++}
++
++/* Hero Section */
++.hero {
++    min-height: 100vh;
++    display: flex;
++    align-items: center;
++    position: relative;
++    padding: 0 2rem;
++}
++
++.hero-container {
++    max-width: 1200px;
++    margin: 0 auto;
++    display: grid;
++    grid-template-columns: 1fr 1fr;
++    gap: 4rem;
++    align-items: center;
++}
++
++.hero-content h1 {
++    font-size: clamp(3rem, 8vw, 5rem);
++    font-weight: 900;
++    line-height: 1.1;
++    margin-bottom: 1.5rem;
++    background: linear-gradient(135deg, var(--text-primary), var(--primary), var(--secondary));
++    -webkit-background-clip: text;
++    -webkit-text-fill-color: transparent;
++    background-clip: text;
++    animation: textShine 3s ease-in-out infinite;
++}
++
++@keyframes textShine {
++    0%, 100% { background-position: 0% 50%; }
++    50% { background-position: 100% 50%; }
++}
++
++.hero-content p {
++    font-size: 1.25rem;
++    color: var(--text-secondary);
++    margin-bottom: 2rem;
++    line-height: 1.7;
++}
++
++.hero-buttons {
++    display: flex;
++    gap: 1rem;
++    flex-wrap: wrap;
++}
++
++.btn {
++    padding: 1rem 2rem;
++    border: none;
++    border-radius: 12px;
++    font-weight: 600;
++    text-decoration: none;
++    display: inline-flex;
++    align-items: center;
++    gap: 0.5rem;
++    transition: all 0.3s ease;
++    cursor: pointer;
++    position: relative;
++    overflow: hidden;
++}
++
++.btn-primary {
++    background: linear-gradient(135deg, var(--primary), var(--secondary));
++    color: white;
++    box-shadow: 0 8px 32px rgba(0, 212, 255, 0.3);
++}
++
++.btn-primary:hover {
++    transform: translateY(-2px);
++    box-shadow: 0 12px 40px rgba(0, 212, 255, 0.4);
++}
++
++.btn-secondary {
++    background: var(--bg-tertiary);
++    color: var(--text-primary);
++    border: 1px solid var(--border);
++}
++
++.btn-secondary:hover {
++    background: var(--bg-secondary);
++    border-color: var(--primary);
++    transform: translateY(-2px);
++}
++
++/* Hero Visual */
++.hero-visual {
++    position: relative;
++    display: flex;
++    justify-content: center;
++    align-items: center;
++}
++
++.floating-card {
++    position: absolute;
++    background: var(--bg-tertiary);
++    border: 1px solid var(--border);
++    border-radius: 16px;
++    padding: 1.5rem;
++    backdrop-filter: blur(20px);
++    animation: float 6s ease-in-out infinite;
++}
++
++.floating-card:nth-child(1) {
++    top: 20%;
++    left: 10%;
++    animation-delay: 0s;
++}
++
++.floating-card:nth-child(2) {
++    top: 60%;
++    right: 10%;
++    animation-delay: -2s;
++}
++
++.floating-card:nth-child(3) {
++    bottom: 20%;
++    left: 20%;
++    animation-delay: -4s;
++}
++
++@keyframes float {
++    0%, 100% { transform: translateY(0px); }
++    50% { transform: translateY(-20px); }
++}
++
++.card-icon {
++    width: 40px;
++    height: 40px;
++    background: linear-gradient(135deg, var(--primary), var(--secondary));
++    border-radius: 10px;
++    display: flex;
++    align-items: center;
++    justify-content: center;
++    margin-bottom: 1rem;
++    font-size: 1.25rem;
++}
++
++.card-title {
++    font-weight: 600;
++    margin-bottom: 0.5rem;
++    color: var(--text-primary);
++}
++
++.card-desc {
++    color: var(--text-secondary);
++    font-size: 0.9rem;
++}
++
++/* Features Section */
++.features {
++    padding: 6rem 2rem;
++    background: var(--bg-secondary);
++}
++
++.container {
++    max-width: 1200px;
++    margin: 0 auto;
++}
++
++.section-header {
++    text-align: center;
++    margin-bottom: 4rem;
++}
++
++.section-title {
++    font-size: 3rem;
++    font-weight: 800;
++    margin-bottom: 1rem;
++    background: linear-gradient(135deg, var(--text-primary), var(--primary));
++    -webkit-background-clip: text;
++    -webkit-text-fill-color: transparent;
++    background-clip: text;
++}
++
++.section-subtitle {
++    font-size: 1.25rem;
++    color: var(--text-secondary);
++    max-width: 600px;
++    margin: 0 auto;
++}
++
++.features-grid {
++    display: grid;
++    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
++    gap: 2rem;
++}
++
++.feature-card {
++    background: var(--bg-tertiary);
++    border: 1px solid var(--border);
++    border-radius: 20px;
++    padding: 2rem;
++    transition: all 0.3s ease;
++    position: relative;
++    overflow: hidden;
++}
++
++.feature-card::before {
++    content: '';
++    position: absolute;
++    top: 0;
++    left: -100%;
++    width: 100%;
++    height: 100%;
++    background: linear-gradient(90deg, transparent, rgba(0, 212, 255, 0.1), transparent);
++    transition: left 0.5s ease;
++}
++
++.feature-card:hover::before {
++    left: 100%;
++}
++
++.feature-card:hover {
++    transform: translateY(-8px);
++    border-color: var(--primary);
++    box-shadow: 0 20px 40px rgba(0, 212, 255, 0.1);
++}
++
++.feature-icon {
++    width: 60px;
++    height: 60px;
++    background: linear-gradient(135deg, var(--primary), var(--secondary));
++    border-radius: 16px;
++    display: flex;
++    align-items: center;
++    justify-content: center;
++    font-size: 1.5rem;
++    margin-bottom: 1.5rem;
++    box-shadow: 0 8px 32px rgba(0, 212, 255, 0.3);
++}
++
++.feature-title {
++    font-size: 1.5rem;
++    font-weight: 700;
++    margin-bottom: 1rem;
++    color: var(--text-primary);
++}
++
++.feature-desc {
++    color: var(--text-secondary);
++    line-height: 1.7;
++}
++
++/* Registration Section */
++.registration {
++    padding: 6rem 2rem;
++    background: var(--bg-primary);
++}
++
++.registration-container {
++    max-width: 500px;
++    margin: 0 auto;
++    background: var(--bg-tertiary);
++    border: 1px solid var(--border);
++    border-radius: 24px;
++    padding: 3rem;
++    position: relative;
++    overflow: hidden;
++}
++
++.registration-container::before {
++    content: '';
++    position: absolute;
++    top: 0;
++    left: 0;
++    right: 0;
++    height: 4px;
++    background: linear-gradient(90deg, var(--primary), var(--secondary), var(--accent));
++}
++
++.form-group {
++    margin-bottom: 1.5rem;
++}
++
++.form-group label {
++    display: block;
++    color: var(--text-primary);
++    font-weight: 600;
++    margin-bottom: 0.5rem;
++}
++
++.form-group input,
++.form-group select {
++    width: 100%;
++    padding: 1rem;
++    background: var(--bg-secondary);
++    border: 1px solid var(--border);
++    border-radius: 12px;
++    color: var(--text-primary);
++    font-size: 1rem;
++    transition: all 0.3s ease;
++}
++
++.form-group input::placeholder {
++    color: var(--text-muted);
++}
++
++.form-group input:focus,
++.form-group select:focus {
++    outline: none;
++    border-color: var(--primary);
++    box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.1);
++}
++
++.form-group select option {
++    background: var(--bg-secondary);
++    color: var(--text-primary);
++}
++
++.checkbox-group {
++    display: flex;
++    align-items: center;
++    gap: 0.75rem;
++    margin-bottom: 1.5rem;
++}
++
++.checkbox-group input[type="checkbox"] {
++    width: auto;
++    margin: 0;
++}
++
++.checkbox-group label {
++    margin: 0;
++    color: var(--text-secondary);
++    font-weight: 400;
++}
++
++.btn-register {
++    width: 100%;
++    padding: 1rem;
++    background: linear-gradient(135deg, var(--primary), var(--secondary));
++    color: white;
++    border: none;
++    border-radius: 12px;
++    font-size: 1.1rem;
++    font-weight: 600;
++    cursor: pointer;
++    transition: all 0.3s ease;
++    box-shadow: 0 8px 32px rgba(0, 212, 255, 0.3);
++}
++
++.btn-register:hover {
++    transform: translateY(-2px);
++    box-shadow: 0 12px 40px rgba(0, 212, 255, 0.4);
++}
++
++.btn-register:disabled {
++    opacity: 0.6;
++    cursor: not-allowed;
++    transform: none;
++}
++
++.success-message {
++    background: rgba(16, 185, 129, 0.1);
++    border: 1px solid rgba(16, 185, 129, 0.3);
++    color: var(--success);
++    padding: 1rem;
++    border-radius: 12px;
++    margin-bottom: 1.5rem;
++    text-align: center;
++    display: none;
++}
++
++.error-message {
++    background: rgba(239, 68, 68, 0.1);
++    border: 1px solid rgba(239, 68, 68, 0.3);
++    color: var(--error);
++    padding: 1rem;
++    border-radius: 12px;
++    margin-bottom: 1.5rem;
++    text-align: center;
++    display: none;
++}
++
++.loading {
++    display: none;
++    text-align: center;
++    color: var(--text-secondary);
++    margin-top: 1rem;
++}
++
++.spinner {
++    border: 2px solid var(--border);
++    border-top: 2px solid var(--primary);
++    border-radius: 50%;
++    width: 20px;
++    height: 20px;
++    animation: spin 1s linear infinite;
++    display: inline-block;
++    margin-right: 0.5rem;
++}
++
++@keyframes spin {
++    0% { transform: rotate(0deg); }
++    100% { transform: rotate(360deg); }
++}
++
++/* API Documentation Styles */
++.api-docs {
++    padding: 6rem 2rem;
++    background: var(--bg-secondary);
++}
++
++.api-container {
++    max-width: 1000px;
++    margin: 0 auto;
++}
++
++.api-endpoint {
++    background: var(--bg-tertiary);
++    border: 1px solid var(--border);
++    border-radius: 12px;
++    margin-bottom: 2rem;
++    overflow: hidden;
++}
++
++.api-header {
++    background: var(--bg-primary);
++    padding: 1rem 1.5rem;
++    border-bottom: 1px solid var(--border);
++    display: flex;
++    align-items: center;
++    gap: 1rem;
++}
++
++.method {
++    padding: 0.25rem 0.75rem;
++    border-radius: 6px;
++    font-weight: 600;
++    font-size: 0.875rem;
++}
++
++.method.get { background: rgba(16, 185, 129, 0.2); color: var(--success); }
++.method.post { background: rgba(59, 130, 246, 0.2); color: #3b82f6; }
++.method.put { background: rgba(245, 158, 11, 0.2); color: var(--warning); }
++.method.delete { background: rgba(239, 68, 68, 0.2); color: var(--error); }
++
++.endpoint-path {
++    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
++    color: var(--text-primary);
++    font-weight: 600;
++}
++
++.api-body {
++    padding: 1.5rem;
++}
++
++.api-description {
++    color: var(--text-secondary);
++    margin-bottom: 1rem;
++}
++
++.api-params {
++    margin-top: 1rem;
++}
++
++.param-table {
++    width: 100%;
++    border-collapse: collapse;
++    margin-top: 1rem;
++}
++
++.param-table th,
++.param-table td {
++    padding: 0.75rem;
++    text-align: left;
++    border-bottom: 1px solid var(--border);
++}
++
++.param-table th {
++    background: var(--bg-primary);
++    color: var(--text-primary);
++    font-weight: 600;
++}
++
++.param-table td {
++    color: var(--text-secondary);
++}
++
++.param-name {
++    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
++    color: var(--primary);
++    font-weight: 600;
++}
++
++.param-type {
++    color: var(--accent);
++    font-size: 0.875rem;
++}
++
++/* Stats Section */
++.stats {
++    padding: 6rem 2rem;
++    background: var(--bg-primary);
++}
++
++.stats-grid {
++    display: grid;
++    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
++    gap: 2rem;
++    text-align: center;
++}
++
++.stat-item {
++    padding: 2rem;
++    background: var(--bg-tertiary);
++    border: 1px solid var(--border);
++    border-radius: 20px;
++    transition: all 0.3s ease;
++}
++
++.stat-item:hover {
++    transform: translateY(-4px);
++    border-color: var(--primary);
++}
++
++.stat-number {
++    font-size: 3rem;
++    font-weight: 900;
++    background: linear-gradient(135deg, var(--primary), var(--secondary));
++    -webkit-background-clip: text;
++    -webkit-text-fill-color: transparent;
++    background-clip: text;
++    margin-bottom: 0.5rem;
++}
++
++.stat-label {
++    color: var(--text-secondary);
++    font-weight: 600;
++}
++
++/* Footer */
++.footer {
++    padding: 3rem 2rem;
++    background: var(--bg-primary);
++    border-top: 1px solid var(--border);
++}
++
++.footer-content {
++    max-width: 1200px;
++    margin: 0 auto;
++    display: grid;
++    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
++    gap: 2rem;
++    margin-bottom: 2rem;
++}
++
++.footer-section h3 {
++    color: var(--text-primary);
++    margin-bottom: 1rem;
++    font-size: 1.25rem;
++}
++
++.footer-section p,
++.footer-section a {
++    color: var(--text-secondary);
++    text-decoration: none;
++    margin-bottom: 0.5rem;
++    display: block;
++    transition: color 0.3s ease;
++}
++
++.footer-section a:hover {
++    color: var(--primary);
++}
++
++.social-links {
++    display: flex;
++    gap: 1rem;
++    margin-top: 1rem;
++}
++
++.social-link {
++    width: 40px;
++    height: 40px;
++    background: var(--bg-tertiary);
++    border: 1px solid var(--border);
++    border-radius: 10px;
++    display: flex;
++    align-items: center;
++    justify-content: center;
++    color: var(--text-secondary);
++    text-decoration: none;
++    transition: all 0.3s ease;
++}
++
++.social-link:hover {
++    background: var(--primary);
++    color: white;
++    transform: translateY(-2px);
++}
++
++.footer-bottom {
++    text-align: center;
++    padding-top: 2rem;
++    border-top: 1px solid var(--border);
++    color: var(--text-muted);
++}
++
++/* Responsive */
++@media (max-width: 768px) {
++    .nav-links {
++        display: none;
++    }
++
++    .hero-container {
++        grid-template-columns: 1fr;
++        gap: 2rem;
++        text-align: center;
++    }
++
++    .hero-buttons {
++        justify-content: center;
++    }
++
++    .features-grid {
++        grid-template-columns: 1fr;
++    }
++
++    .registration-container {
++        margin: 0 1rem;
++        padding: 2rem;
++    }
++
++    .footer-content {
++        grid-template-columns: 1fr;
++        text-align: center;
++    }
++}
++
++/* Animations */
++.fade-in-up {
++    opacity: 0;
++    transform: translateY(30px);
++    animation: fadeInUp 0.8s ease-out forwards;
++}
++
++@keyframes fadeInUp {
++    to {
++        opacity: 1;
++        transform: translateY(0);
++    }
++}
++
++.stagger-1 { animation-delay: 0.1s; }
++.stagger-2 { animation-delay: 0.2s; }
++.stagger-3 { animation-delay: 0.3s; }
++.stagger-4 { animation-delay: 0.4s; }
