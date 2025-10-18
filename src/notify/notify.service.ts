@@ -15,7 +15,7 @@ export class NotifyService {
     private readonly emailService: EmailService,
   ) {}
 
-  @Cron(CronExpression.EVERY_DAY_AT_9AM)
+  @Cron(CronExpression.EVERY_DAY_AT_4AM)
   async createNotification() {
     try {
       this.logger.log('Starting daily notification process...');
